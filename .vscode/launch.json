@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "01 - Minimal Chat",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/exercises/01_minimal_chat/chat.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "02 - Stateful Chat",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/exercises/02_langgraph_state/stateful_chat.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "03 - Tool Chat",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/exercises/03_tools/tool_chat.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "04 - Memory Chat",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/exercises/04_memory/memory_chat.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "05 - Tiny Claw (Resident)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/exercises/05_resident/tiny_claw.py",
+      "console": "integratedTerminal"
+    }
+  ]
+}

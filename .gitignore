@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# uv
+uv.lock
+
+# Ruff
+.ruff_cache/
+
+# Memory store (generated at runtime)
+memory_store/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
