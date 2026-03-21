@@ -16,7 +16,8 @@
 ## 実行
 
 ```bash
-uv run python exercises/02_langgraph_state/stateful_chat.py
+make run-02
+# または: uv run python exercises/02_langgraph_state/stateful_chat.py
 ```
 
 ## ポイント

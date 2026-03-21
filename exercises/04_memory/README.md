@@ -27,7 +27,8 @@ flowchart TD
 ## 実行
 
 ```bash
-uv run python exercises/04_memory/memory_chat.py
+make run-04
+# または: uv run python exercises/04_memory/memory_chat.py
 ```
 
 ## ポイント

@@ -30,7 +30,8 @@ flowchart TD
 ## 実行
 
 ```bash
-uv run python exercises/05_resident/tiny_claw.py
+make run-05
+# または: uv run python exercises/05_resident/tiny_claw.py
 ```
 
 ## ポイント

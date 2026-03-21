@@ -27,7 +27,8 @@ flowchart TD
 ## 実行
 
 ```bash
-uv run python exercises/03_tools/tool_chat.py
+make run-03
+# または: uv run python exercises/03_tools/tool_chat.py
 ```
 
 ## ポイント

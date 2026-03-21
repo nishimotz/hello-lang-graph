@@ -16,7 +16,8 @@
 ## 実行
 
 ```bash
-uv run python exercises/01_minimal_chat/chat.py
+make run-01
+# または: uv run python exercises/01_minimal_chat/chat.py
 ```
 
 ## ポイント

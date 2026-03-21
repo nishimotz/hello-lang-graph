@@ -10,7 +10,7 @@
 ## 完成イメージ（2時間後）
 
 ```text
-$ uv run python exercises/05_resident/tiny_claw.py
+$ make run-05
 
 Tiny Claw
 起動中... 待機します
@@ -46,7 +46,8 @@ LM Studio を使う場合の推奨ハード:
 ```bash
 git clone https://github.com/nishimotz/hello-lang-graph.git
 cd hello-lang-graph
-uv sync
+make sync
+# または: uv sync
 ```
 
 ## プロバイダの選び方
@@ -68,7 +69,8 @@ uv sync
 3. そのまま実行する
 
 ```bash
-uv run python exercises/01_minimal_chat/chat.py
+make run-01
+# または: uv run python exercises/01_minimal_chat/chat.py
 ```
 
 ### 2. OpenRouter を使う場合
@@ -81,7 +83,8 @@ uv run python exercises/01_minimal_chat/chat.py
 export LLM_PROVIDER=openrouter
 export OPENROUTER_API_KEY=your_api_key
 export OPENROUTER_MODEL=openai/gpt-oss-20b:free
-uv run python exercises/01_minimal_chat/chat.py
+make run-01
+# または: uv run python exercises/01_minimal_chat/chat.py
 ```
 
 ## 実演前チェック
@@ -92,7 +95,7 @@ uv run python exercises/01_minimal_chat/chat.py
 2. `Exercise 01` を先に起動してチャット疎通を確認する
 3. 別ターミナルで最小動作を確認する
    ```bash
-   uv run python exercises/01_minimal_chat/chat.py
+   make run-01
    ```
 
 接続先の準備が未完了でも、各スクリプトはヒントを表示して停止するようにしてあります。
@@ -126,7 +129,8 @@ uv run python exercises/01_minimal_chat/chat.py
 1. Exercise の `README.md` を読む
 2. スクリプトを実行して動作を確認する
    ```bash
-   uv run python exercises/01_minimal_chat/chat.py
+   make run-01
+   # または: uv run python exercises/01_minimal_chat/chat.py
    ```
 3. コードを読んで、編集して、再実行してみる
 
