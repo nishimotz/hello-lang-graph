@@ -10,7 +10,6 @@ import sys
 from pathlib import Path
 from typing import Annotated, TypedDict
 
-import tiktoken
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
@@ -27,7 +26,7 @@ from hello_lang_graph.memory import (
 )
 
 MEMORY_DIR = Path("memory_store")
-MAX_CONTEXT_TOKENS = 4096
+MAX_CONTEXT_CHARS = 8000  # 日本語では1文字≈1〜2トークン相当
 
 
 # ========== State定義 ==========
@@ -53,24 +52,18 @@ SYSTEM_PROMPT = (
     "保存済みの会話サマリやユーザー情報があれば、それも参考にしてください。"
 )
 
-encoding = tiktoken.get_encoding("cl100k_base")
+# ========== コンテキスト長管理 ==========
 
 
-# ========== トークン管理 ==========
-
-
-def count_tokens(messages: list) -> int:
-    """メッセージ列のトークン数を概算する。"""
-    total = 0
-    for msg in messages:
-        total += len(encoding.encode(msg.content if hasattr(msg, "content") else ""))
-    return total
+def count_chars(messages: list) -> int:
+    """メッセージ列の合計文字数を返す。"""
+    return sum(len(msg.content) if hasattr(msg, "content") else 0 for msg in messages)
 
 
 def summarize_if_needed(state: AgentState) -> list:
-    """トークン数が多い場合、古い会話を要約する。"""
+    """文字数が多い場合、古い会話を要約する。"""
     messages = state["messages"]
-    if count_tokens(messages) <= MAX_CONTEXT_TOKENS:
+    if count_chars(messages) <= MAX_CONTEXT_CHARS:
         return messages
 
     old_messages = messages[:-4]

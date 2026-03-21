@@ -9,7 +9,6 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-openai>=0.3",
     "duckduckgo-search>=7",
-    "tiktoken>=0.9",
 ]
 
 [project.optional-dependencies]

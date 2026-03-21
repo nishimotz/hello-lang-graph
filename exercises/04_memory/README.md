@@ -32,7 +32,7 @@ uv run python exercises/04_memory/memory_chat.py
 
 ## ポイント
 
-- `tiktoken` でトークン数を計測し、一定量を超えたら要約を生成
+- 文字数を計測し、一定量を超えたら要約を生成
 - 会話サマリを `summary_memory.json` に保存する
 - ユーザー情報を構造化メモとして保存する
 - 次の質問では保存済みメモを system prompt に注入する
