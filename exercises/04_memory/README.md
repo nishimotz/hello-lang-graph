@@ -11,6 +11,19 @@
 03 まではセッション内の会話履歴のみでしたが、
 ここでは **会話サマリと構造化メモをファイル保存する長期記憶** を追加します。
 
+## グラフの流れ
+
+```mermaid
+flowchart TD
+    input[ユーザー入力] --> load[load_memory]
+    load --> chat[chat ノード]
+    chat --> has_tools{ツール呼び出しあり?}
+    has_tools -->|あり| tools[tools]
+    tools --> chat
+    has_tools -->|なし| save[save_memory]
+    save --> end_node[END]
+```
+
 ## 実行
 
 ```bash

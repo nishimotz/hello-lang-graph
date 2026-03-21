@@ -11,6 +11,19 @@
 02 ではLLMが応答するだけでしたが、ここでは **ツールを使って外部と連携** します。
 グラフに条件分岐を追加し、ツール呼び出しの有無でフローが変わります。
 
+## グラフの流れ
+
+```mermaid
+flowchart TD
+    input[ユーザー入力] --> chat[chat ノード]
+    chat --> has_tools{ツール呼び出しあり?}
+    has_tools -->|なし| end_node[END]
+    has_tools -->|安全なツール| safe[safe_tools]
+    has_tools -->|危険なツール| review[human_review]
+    safe --> chat
+    review --> chat
+```
+
 ## 実行
 
 ```bash

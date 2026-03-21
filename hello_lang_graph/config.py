@@ -38,7 +38,11 @@ def get_chat_config() -> ChatRuntimeConfig:
         return ChatRuntimeConfig(
             provider=provider,
             base_url=_env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
-            model=_env("OPENROUTER_MODEL", "LLM_CHAT_MODEL", default="openai/gpt-oss-20b"),
+            model=_env(
+                "OPENROUTER_MODEL",
+                "LLM_CHAT_MODEL",
+                default="openai/gpt-oss-20b",
+            ),
             api_key=api_key,
             app_name="OpenRouter",
             default_headers=_build_openrouter_headers(),

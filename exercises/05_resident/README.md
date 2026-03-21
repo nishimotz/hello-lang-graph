@@ -11,6 +11,22 @@
 04 までの機能を全て統合し、asyncio で **常駐ループ** にします。
 これが「自分専用常駐AIエージェント」の完成形です。
 
+## グラフの流れ
+
+```mermaid
+flowchart TD
+    cli_input[CLI入力] --> retrieve[retrieve]
+    retrieve --> chat[chat ノード]
+    chat --> has_tools{ツール呼び出しあり?}
+    has_tools -->|安全なツール| safe[safe_tools]
+    has_tools -->|危険なツール| review[human_review]
+    has_tools -->|なし| save[save_memory]
+    safe --> chat
+    review --> chat
+    save --> show[応答表示]
+    show --> cli_input
+```
+
 ## 実行
 
 ```bash

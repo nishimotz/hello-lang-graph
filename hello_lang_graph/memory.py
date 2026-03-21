@@ -58,7 +58,8 @@ def format_memory_context(snapshot: dict[str, Any]) -> str:
 
     recent_topics = snapshot.get("recent_topics", [])
     if recent_topics:
-        sections.append("[最近の話題]\n" + "\n".join(f"- {topic}" for topic in recent_topics))
+        topic_lines = "\n".join(f"- {topic}" for topic in recent_topics)
+        sections.append("[最近の話題]\n" + topic_lines)
 
     return "\n\n".join(sections)
 
@@ -79,7 +80,8 @@ def update_summary(llm: Any, current_summary: str, user_msg: str, ai_msg: str) -
 def extract_profile_updates(llm: Any, user_msg: str, ai_msg: str) -> dict[str, str]:
     """Extract durable user facts as a small JSON object."""
     prompt = (
-        "以下の会話から、今後の対話で役立つユーザー情報だけを JSON object で抽出してください。\n"
+        "以下の会話から、今後の対話で役立つユーザー情報だけを "
+        "JSON object で抽出してください。\n"
         "条件:\n"
         '- キーは短い日本語。例: "好きな言語", "住んでいる場所", "進行中タスク"\n'
         "- 値は短い文字列\n"
@@ -88,7 +90,10 @@ def extract_profile_updates(llm: Any, user_msg: str, ai_msg: str) -> dict[str, s
         f"ユーザー: {user_msg}\nアシスタント: {ai_msg}\n"
     )
     response = llm.invoke(
-        [SystemMessage(content="あなたはJSONだけを返す情報抽出器です。"), HumanMessage(content=prompt)]
+        [
+            SystemMessage(content="あなたはJSONだけを返す情報抽出器です。"),
+            HumanMessage(content=prompt),
+        ]
     )
     content = str(response.content).strip()
     try:
@@ -107,13 +112,17 @@ def extract_profile_updates(llm: Any, user_msg: str, ai_msg: str) -> dict[str, s
 def extract_recent_topics(llm: Any, user_msg: str, ai_msg: str) -> list[str]:
     """Extract up to three short topic labels from the latest turn."""
     prompt = (
-        "以下の会話のトピックを最大3個、短い日本語フレーズの JSON array で返してください。\n"
+        "以下の会話のトピックを最大3個、短い日本語フレーズの "
+        "JSON array で返してください。\n"
         '例: ["大阪の天気", "買い物メモ"]\n'
         "- JSON 以外を出力しない\n\n"
         f"ユーザー: {user_msg}\nアシスタント: {ai_msg}\n"
     )
     response = llm.invoke(
-        [SystemMessage(content="あなたはJSONだけを返すトピック抽出器です。"), HumanMessage(content=prompt)]
+        [
+            SystemMessage(content="あなたはJSONだけを返すトピック抽出器です。"),
+            HumanMessage(content=prompt),
+        ]
     )
     content = str(response.content).strip()
     try:

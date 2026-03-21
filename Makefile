@@ -4,13 +4,14 @@ UV := uv
 LLM_PROVIDER ?= lmstudio
 OPENROUTER_MODEL ?= openai/gpt-oss-20b
 
-.PHONY: help sync check run-01 run-02 run-03 run-04 run-05 \
+.PHONY: help sync check lint run-01 run-02 run-03 run-04 run-05 \
 	run-openrouter-01 run-openrouter-05 clean-memory show-memory
 
 help:
 	@printf '%s\n' \
 		'make sync                - install dependencies with uv sync' \
 		'make check               - run py_compile on shared code and exercises' \
+		'make lint                - run Ruff static checks' \
 		'make run-01              - run Exercise 01' \
 		'make run-02              - run Exercise 02' \
 		'make run-03              - run Exercise 03' \
@@ -34,6 +35,9 @@ check:
 		exercises/03_tools/tool_chat.py \
 		exercises/04_memory/memory_chat.py \
 		exercises/05_resident/tiny_claw.py
+
+lint:
+	$(UV) run ruff check .
 
 run-01:
 	$(UV) run python exercises/01_minimal_chat/chat.py

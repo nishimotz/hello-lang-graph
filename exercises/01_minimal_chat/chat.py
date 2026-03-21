@@ -5,6 +5,7 @@ OpenAI互換APIにLangChainから接続し、
 """
 
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from hello_lang_graph.config import build_chat_llm, get_chat_config
 
 CHAT_CONFIG = get_chat_config()
