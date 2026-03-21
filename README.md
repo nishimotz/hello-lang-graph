@@ -80,7 +80,7 @@ uv run python exercises/01_minimal_chat/chat.py
 ```bash
 export LLM_PROVIDER=openrouter
 export OPENROUTER_API_KEY=your_api_key
-export OPENROUTER_MODEL=openai/gpt-oss-20b
+export OPENROUTER_MODEL=openai/gpt-oss-20b:free
 uv run python exercises/01_minimal_chat/chat.py
 ```
 
