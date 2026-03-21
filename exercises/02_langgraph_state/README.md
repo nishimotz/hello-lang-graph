@@ -28,4 +28,9 @@ uv run python exercises/02_langgraph_state/stateful_chat.py
 
 1. 実行して会話し、思考プロセスが表示されることを確認
 2. `AgentState` にフィールドを追加して、好きな情報を保存してみる
-3. 同じ `thread_id` で再起動すると会話が復元されることを確認
+3. 同じプロセス中では `thread_id` ごとに会話が保持されることを確認
+
+## 注意
+
+このサンプルの `MemorySaver` はプロセス内メモリです。
+スクリプトを再起動すると会話は消えます。

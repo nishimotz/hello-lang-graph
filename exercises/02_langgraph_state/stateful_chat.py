@@ -7,10 +7,10 @@ LangGraphの StateGraph を使い、明示的な状態管理と
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from hello_lang_graph.config import build_chat_llm, get_chat_config
 
 # ========== State定義 ==========
 
@@ -24,12 +24,8 @@ class AgentState(TypedDict):
 
 # ========== LLM設定 ==========
 
-llm = ChatOpenAI(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
-    model="gpt-oss-20b",
-    temperature=0.8,
-)
+CHAT_CONFIG = get_chat_config()
+llm = build_chat_llm(temperature=0.8)
 
 SYSTEM_PROMPT = (
     "あなたは親切で簡潔に回答するアシスタントです。"
@@ -72,6 +68,9 @@ def main() -> None:
     """メインのチャットループ。"""
     print("=== Stateful Chat (LangGraph) ===")
     print("LangGraph StateGraph + MemorySaver")
+    print(f"Provider: {CHAT_CONFIG.app_name}")
+    print(f"API Base URL: {CHAT_CONFIG.base_url}")
+    print(f"Chat Model: {CHAT_CONFIG.model}")
     print("'exit' で終了\n")
 
     memory = MemorySaver()
@@ -93,10 +92,17 @@ def main() -> None:
             print("終了します。")
             break
 
-        result = app.invoke(
-            {"messages": [HumanMessage(content=user_input)]},
-            config=config,
-        )
+        try:
+            result = app.invoke(
+                {"messages": [HumanMessage(content=user_input)]},
+                config=config,
+            )
+        except Exception as exc:
+            print(f"[エラー] {CHAT_CONFIG.app_name} に接続できませんでした。")
+            print(f"  base_url={CHAT_CONFIG.base_url}")
+            print("  API URL、APIキー、モデル名を確認してください。")
+            print(f"  詳細: {exc}\n")
+            continue
 
         # 思考プロセスがあれば表示
         thinking = result.get("thinking", "")

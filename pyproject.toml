@@ -8,9 +8,7 @@ dependencies = [
     "langgraph>=0.4",
     "langchain-core>=0.3",
     "langchain-openai>=0.3",
-    "langchain-community>=0.3",
     "duckduckgo-search>=7",
-    "faiss-cpu>=1.9",
     "tiktoken>=0.9",
 ]
 

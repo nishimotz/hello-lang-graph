@@ -2,7 +2,7 @@
 
 **「軽くて賢くて、24時間自分のPCで動いてくれるエージェントが欲しい」**
 
-それをLangGraphとLM Studio + gpt-oss-20bだけで、2時間で作ってみよう！というハンズオンです。
+それをLangGraphと LM Studio または OpenRouter を使って、2時間で作ってみよう！というハンズオンです。
 
 [hello-litestar-htmx](https://github.com/nishimotz/hello-litestar-htmx)、
 [hello-pandas3](https://github.com/nishimotz/hello-pandas3) に続くシリーズ第3弾です。
@@ -12,7 +12,8 @@
 ```text
 $ uv run python exercises/05_resident/tiny_claw.py
 
-Tiny Claw (gpt-oss-20b / low effort) 起動中... 待機します
+Tiny Claw
+起動中... 待機します
 > 今日の大阪の天気 + デスクトップに「買い物リスト.txt」追記して
 
 [思考プロセス表示] → DuckDuckGo検索 → 天気取得
@@ -24,17 +25,21 @@ y → 「晴れ 21℃です。リストに追記完了！」
 
 - LangGraphを触ったことはあるけど「結局何作れば…？」状態の人
 - ローカルで常駐型AIエージェントを作ってみたい人
-- LM Studio + gpt-oss-20b を本気で活用したい人
+- LM Studio や OpenRouter でエージェントを試したい人
 - 「DockerとかFastAPIとか全部入れるのもう疲れた…」と思ってる人
 
 ## 必要なもの（2026年3月時点）
 
-- **ハード**：16GB RAM以上（RTX 3060〜4070 or M2/M3/M4 Macが快適）
 - **ソフトウェア**
   - Python 3.11+
   - [uv](https://docs.astral.sh/uv/)（パッケージマネージャ）
-  - LM Studio（最新版）
-  - gpt-oss-20b GGUF（Q5_K_M または Q6_K 推奨）
+  - LM Studio（ローカル実行する場合）
+  - OpenRouter アカウント（クラウド実行する場合）
+
+LM Studio を使う場合の推奨ハード:
+
+- 16GB RAM以上（RTX 3060〜4070 or M2/M3/M4 Macが快適）
+- `gpt-oss-20b` GGUF（Q5_K_M または Q6_K 推奨）
 
 ## セットアップ
 
@@ -44,15 +49,63 @@ cd hello-lang-graph
 uv sync
 ```
 
+## プロバイダの選び方
+
+- `LM Studio`:
+  ローカル完結。回線に依存しにくいが、モデル準備とマシンスペックが必要
+- `OpenRouter`:
+  すぐ始めやすい。LM Studio が使えない参加者向けの代替ルート
+
+この教材では `Exercise 01-05` を LM Studio / OpenRouter のどちらでも進められます。
+後半は embeddings を使わず、要約メモリと構造化メモで長期記憶を作ります。
+
+## セットアップ例
+
+### 1. LM Studio を使う場合
+
+1. LM Studio でチャットモデル `gpt-oss-20b` をロードする
+2. LM Studio の `Local Server` を有効にする
+3. そのまま実行する
+
+```bash
+uv run python exercises/01_minimal_chat/chat.py
+```
+
+### 2. OpenRouter を使う場合
+
+1. APIキーを設定する
+2. `LLM_PROVIDER=openrouter` を設定する
+3. モデル名を設定する
+
+```bash
+export LLM_PROVIDER=openrouter
+export OPENROUTER_API_KEY=your_api_key
+export OPENROUTER_MODEL=openai/gpt-oss-20b
+uv run python exercises/01_minimal_chat/chat.py
+```
+
+## 実演前チェック
+
+2時間のハンズオンをスムーズに進めるため、開始前に以下だけ確認してください。
+
+1. 使うプロバイダを `LM Studio` か `OpenRouter` で決める
+2. `Exercise 01` を先に起動してチャット疎通を確認する
+3. 別ターミナルで最小動作を確認する
+   ```bash
+   uv run python exercises/01_minimal_chat/chat.py
+   ```
+
+接続先の準備が未完了でも、各スクリプトはヒントを表示して停止するようにしてあります。
+
 ## 2時間タイムテーブル
 
 | 時間       | 内容                                              | Exercise |
 |------------|---------------------------------------------------|----------|
-| 0:00–0:10  | LM Studioでgpt-oss-20bを起動 & Local Server設定   | -        |
+| 0:00–0:10  | 使用プロバイダ設定（LM Studio または OpenRouter） | -        |
 | 0:10–0:25  | LangGraph最小グラフ（chat + stream）              | 01       |
 | 0:25–0:45  | State設計（記憶＋思考プロセス保存）               | 02       |
 | 0:45–1:10  | ツール呼び出し + human-in-the-loop                | 03       |
-| 1:10–1:35  | 簡易長期記憶（MemorySaver + 直近会話ベクトル）    | 04       |
+| 1:10–1:35  | 簡易長期記憶（要約メモリ + 構造化メモ）           | 04       |
 | 1:35–1:50  | 常駐ループ（asyncio + CLI入力）                   | 05       |
 | 1:50–2:00  | デモ・デバッグ・Q&A                               | -        |
 
@@ -62,10 +115,10 @@ uv sync
 
 | # | ディレクトリ | 内容 | スクリプト |
 |---|---|---|---|
-| 01 | `exercises/01_minimal_chat/` | LM Studio接続 + 最小チャット | `chat.py` |
+| 01 | `exercises/01_minimal_chat/` | OpenAI互換API接続 + 最小チャット | `chat.py` |
 | 02 | `exercises/02_langgraph_state/` | LangGraphグラフ + State設計 | `stateful_chat.py` |
 | 03 | `exercises/03_tools/` | ツール呼び出し + human-in-the-loop | `tool_chat.py` |
-| 04 | `exercises/04_memory/` | 簡易長期記憶 | `memory_chat.py` |
+| 04 | `exercises/04_memory/` | 要約メモリ + 構造化メモ | `memory_chat.py` |
 | 05 | `exercises/05_resident/` | 常駐ループ完成版 | `tiny_claw.py` |
 
 各 Exercise の進め方：
@@ -76,6 +129,32 @@ uv sync
    uv run python exercises/01_minimal_chat/chat.py
    ```
 3. コードを読んで、編集して、再実行してみる
+
+## 実演の進め方
+
+実演では、毎章で次の順に進めると詰まりにくいです。
+
+1. その章の `README.md` を30秒で説明する
+2. スクリプトを起動して成功ケースを1つ見せる
+3. コードの差分ポイントを2〜3箇所だけ読む
+4. 受講者に「ここを変えると何が起きるか」を1つ試してもらう
+
+各章のおすすめデモ入力:
+
+- 01: `LangGraphって何？`
+- 02: `私の好きな言語はPythonです。覚えて`
+- 03: `大阪の天気を教えて`
+- 03: `~/Desktop/demo_memo.txt に 今日の買い物 を書いて`
+- 04: `さっき覚えてって言った好きな言語は？`
+- 05: `大阪の天気を調べて ~/Desktop/demo_memo.txt に追記して`
+
+## デモ時の注意
+
+- `MemorySaver` はプロセス内メモリです。Exercise 02/03 の会話は再起動後には残りません。
+- Exercise 04/05 の長期記憶は `summary_memory.json` に保存されるため、再起動後も参照できます。
+- Exercise 05 は `asyncio` ベースですが、危険ツールの承認確認は同期入力です。
+- DuckDuckGo 検索が使えない環境でも、エラーメッセージを返して進行できるようにしています。
+- OpenRouter でも `Exercise 01-05` を通しやすくなっています。
 
 ## 推奨LM Studio設定（gpt-oss-20b）
 
@@ -93,3 +172,12 @@ uv sync
 - Langfuseでログ・トレース
 - Telegram / Discord bot化
 - 複数ツール（カレンダー、メール、ブラウザ操作など）
+
+## 主な環境変数
+
+- `LLM_PROVIDER`: `lmstudio` または `openrouter`
+- `LLM_CHAT_MODEL`: 共通のチャットモデル名上書き
+- `LM_STUDIO_BASE_URL`: LM Studio の API URL
+- `LM_STUDIO_CHAT_MODEL`: LM Studio 利用時のモデル名
+- `OPENROUTER_API_KEY`: OpenRouter の APIキー
+- `OPENROUTER_MODEL`: OpenRouter 利用時のモデル名

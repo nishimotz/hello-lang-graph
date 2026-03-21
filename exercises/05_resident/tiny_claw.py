@@ -1,7 +1,8 @@
 """Exercise 05: 常駐ループ完成版 — Tiny Claw
 
 全機能を統合した常駐型AIエージェント。
-asyncio で非同期に動作し、ツール呼び出し・human-in-the-loop・長期記憶を備える。
+asyncio で非同期に動作し、ツール呼び出し・human-in-the-loop・
+要約メモリを備える。
 """
 
 import asyncio
@@ -12,11 +13,20 @@ from typing import Annotated, TypedDict
 import tiktoken
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
+from hello_lang_graph.config import (
+    build_chat_llm,
+    get_chat_config,
+)
+from hello_lang_graph.memory import (
+    format_memory_context,
+    load_memory_snapshot,
+    save_memory_snapshot,
+    update_memory_snapshot,
+)
 
 MEMORY_DIR = Path("memory_store")
 MAX_CONTEXT_TOKENS = 4096
@@ -33,69 +43,19 @@ class AgentState(TypedDict):
     context: str
 
 
-# ========== LLM・Embeddings設定 ==========
+# ========== LLM設定 ==========
 
-llm = ChatOpenAI(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
-    model="gpt-oss-20b",
-    temperature=0.8,
-)
-
-embeddings = OpenAIEmbeddings(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
-    model="text-embedding-nomic-embed-text-v1.5",
-)
+CHAT_CONFIG = get_chat_config()
+llm = build_chat_llm(temperature=0.8)
 
 SYSTEM_PROMPT = (
-    "あなは Tiny Claw、ユーザーのローカルPCで常駐するAIアシスタントです。\n"
+    "あなたは Tiny Claw、ユーザーのローカルPCで常駐するAIアシスタントです。\n"
     "日本語で簡潔に応答してください。\n"
     "必要に応じてツールを使ってください。\n"
-    "過去の会話コンテキストが与えられた場合は、それも参考にしてください。"
+    "保存済みの会話サマリやユーザー情報があれば、それも参考にしてください。"
 )
 
 encoding = tiktoken.get_encoding("cl100k_base")
-
-
-# ========== ベクトルストア管理 ==========
-
-
-def get_vector_store():
-    """FAISSベクトルストアを取得。"""
-    from langchain_community.vectorstores import FAISS
-
-    index_path = MEMORY_DIR / "index.faiss"
-    if index_path.exists():
-        return FAISS.load_local(
-            str(MEMORY_DIR), embeddings, allow_dangerous_deserialization=True
-        )
-    return None
-
-
-def save_to_memory(user_msg: str, ai_msg: str) -> None:
-    """会話ペアをベクトルストアに保存する。"""
-    from langchain_community.vectorstores import FAISS
-
-    text = f"ユーザー: {user_msg}\nアシスタント: {ai_msg}"
-    store = get_vector_store()
-    if store is None:
-        MEMORY_DIR.mkdir(exist_ok=True)
-        store = FAISS.from_texts([text], embeddings)
-    else:
-        store.add_texts([text])
-    store.save_local(str(MEMORY_DIR))
-
-
-def search_memory(query: str, k: int = 3) -> str:
-    """クエリに関連する過去の会話を検索する。"""
-    store = get_vector_store()
-    if store is None:
-        return ""
-    docs = store.similarity_search(query, k=k)
-    if not docs:
-        return ""
-    return "\n---\n".join(doc.page_content for doc in docs)
 
 
 # ========== トークン管理 ==========
@@ -140,8 +100,11 @@ def web_search(query: str) -> str:
     """DuckDuckGoでWeb検索を行い、結果を返す。"""
     from duckduckgo_search import DDGS
 
-    with DDGS() as ddgs:
-        results = list(ddgs.text(query, max_results=3))
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+    except Exception as exc:
+        return f"検索に失敗しました: {exc}"
     if not results:
         return "検索結果が見つかりませんでした。"
     return "\n\n".join(
@@ -153,12 +116,15 @@ def web_search(query: str) -> str:
 def write_file(filepath: str, content: str) -> str:
     """指定パスにテキストファイルを書き込む。既存ファイルには追記する。"""
     path = Path(filepath).expanduser()
-    if path.exists():
-        with path.open("a", encoding="utf-8") as f:
-            f.write(content + "\n")
-    else:
-        path.write_text(content + "\n", encoding="utf-8")
-    return f"ファイルに書き込みました: {path}"
+    try:
+        if path.exists():
+            with path.open("a", encoding="utf-8") as f:
+                f.write(content + "\n")
+        else:
+            path.write_text(content + "\n", encoding="utf-8")
+        return f"ファイルに書き込みました: {path}"
+    except Exception as exc:
+        return f"ファイル書き込みに失敗しました: {path} ({exc})"
 
 
 @tool
@@ -184,15 +150,9 @@ llm_with_tools = llm.bind_tools(all_tools)
 
 
 def retrieve_context(state: AgentState) -> dict:
-    """最新のユーザーメッセージで過去の会話を検索する。"""
-    messages = state["messages"]
-    last_human = ""
-    for msg in reversed(messages):
-        if isinstance(msg, HumanMessage):
-            last_human = msg.content
-            break
-    context = search_memory(last_human) if last_human else ""
-    return {"context": context}
+    """保存済みの会話サマリと構造化メモを読み込む。"""
+    snapshot = load_memory_snapshot(MEMORY_DIR)
+    return {"context": format_memory_context(snapshot)}
 
 
 def chat_node(state: AgentState) -> dict:
@@ -202,7 +162,7 @@ def chat_node(state: AgentState) -> dict:
     system_content = SYSTEM_PROMPT
     context = state.get("context", "")
     if context:
-        system_content += f"\n\n[過去の関連する会話]\n{context}"
+        system_content += f"\n\n[保存済みメモ]\n{context}"
 
     full_messages = [SystemMessage(content=system_content)] + messages
     response = llm_with_tools.invoke(full_messages)
@@ -260,7 +220,7 @@ def route_after_chat(state: AgentState) -> str:
 
 
 def save_memory_node(state: AgentState) -> dict:
-    """会話をベクトルストアに保存する。"""
+    """会話サマリと構造化メモを保存する。"""
     messages = state["messages"]
     human_msg = ""
     ai_msg = ""
@@ -272,7 +232,9 @@ def save_memory_node(state: AgentState) -> dict:
         if human_msg and ai_msg:
             break
     if human_msg and ai_msg:
-        save_to_memory(human_msg, ai_msg)
+        snapshot = load_memory_snapshot(MEMORY_DIR)
+        next_snapshot = update_memory_snapshot(llm, snapshot, human_msg, ai_msg)
+        save_memory_snapshot(MEMORY_DIR, next_snapshot)
     return {}
 
 
@@ -311,9 +273,13 @@ async def async_input(prompt: str) -> str:
 async def main() -> None:
     """非同期メインループ。"""
     print("=" * 50)
-    print("  Tiny Claw (gpt-oss-20b / low effort)")
+    print("  Tiny Claw")
     print("  起動中... 待機します")
     print("=" * 50)
+    print(f"Provider: {CHAT_CONFIG.app_name}")
+    print(f"API Base URL: {CHAT_CONFIG.base_url}")
+    print(f"Chat Model: {CHAT_CONFIG.model}")
+    print(f"Memory File: {MEMORY_DIR / 'summary_memory.json'}")
     print("'exit' で終了\n")
 
     memory = MemorySaver()
@@ -336,10 +302,16 @@ async def main() -> None:
             break
 
         # LangGraph を非同期で呼び出し
-        result = await app.ainvoke(
-            {"messages": [HumanMessage(content=user_input)]},
-            config=config,
-        )
+        try:
+            result = await app.ainvoke(
+                {"messages": [HumanMessage(content=user_input)]},
+                config=config,
+            )
+        except Exception as exc:
+            print("[エラー] 実行に失敗しました。")
+            print("  チャット用 API URL、APIキー、モデル名を確認してください。")
+            print(f"  詳細: {exc}\n")
+            continue
 
         thinking = result.get("thinking", "")
         if thinking:

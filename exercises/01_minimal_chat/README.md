@@ -1,15 +1,17 @@
-# Exercise 01: LM Studio接続 + 最小チャット
+# Exercise 01: OpenAI互換API接続 + 最小チャット
 
 ## 目標
 
-- LM Studioの Local Server に LangChain から接続する
+- OpenAI互換APIに LangChain から接続する
 - 最小限のチャットループを作る
 - ストリーミング出力を体験する
 
 ## 前提
 
-LM Studio で gpt-oss-20b をロードし、Local Server を起動済みであること。
-デフォルトでは `http://localhost:1234/v1` でOpenAI互換APIが利用できます。
+以下のどちらかを準備してください。
+
+- LM Studio でモデルをロードし、Local Server を起動する
+- OpenRouter の API キーを用意する
 
 ## 実行
 
@@ -19,9 +21,9 @@ uv run python exercises/01_minimal_chat/chat.py
 
 ## ポイント
 
-- `ChatOpenAI` の `base_url` を LM Studio のローカルサーバーに向ける
-- `api_key` は LM Studio では不要だが、ライブラリ的に空文字列を渡す必要がある
-- `model` にはLM Studioでロード中のモデル名を指定（何でもOK、LM Studio側で無視される）
+- `ChatOpenAI` は OpenAI互換API なら LM Studio / OpenRouter のどちらにも接続できる
+- 接続先は `LLM_PROVIDER` などの環境変数で切り替えられる
+- `model` には利用中のプロバイダのモデル名を指定する
 - `streaming=True` でトークン単位のリアルタイム出力が得られる
 
 ## やってみよう

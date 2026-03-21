@@ -1,21 +1,14 @@
-"""Exercise 01: LM Studio接続 + 最小チャット
+"""Exercise 01: OpenAI互換API接続 + 最小チャット
 
-LM StudioのLocal ServerにLangChainから接続し、
+OpenAI互換APIにLangChainから接続し、
 ストリーミングで対話するミニマルなチャットスクリプト。
 """
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+from hello_lang_graph.config import build_chat_llm, get_chat_config
 
-# LM Studio Local Server に接続
-# api_key は LM Studio では検証されないが、ライブラリが要求するため設定
-llm = ChatOpenAI(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
-    model="gpt-oss-20b",
-    temperature=0.8,
-    streaming=True,
-)
+CHAT_CONFIG = get_chat_config()
+llm = build_chat_llm(temperature=0.8, streaming=True)
 
 SYSTEM_PROMPT = (
     "あなたは親切で簡潔に回答するアシスタントです。"
@@ -25,8 +18,10 @@ SYSTEM_PROMPT = (
 
 def main() -> None:
     """メインのチャットループ。"""
-    print("=== Minimal Chat (LM Studio) ===")
-    print("LM Studio Local Server に接続中...")
+    print("=== Minimal Chat ===")
+    print(f"Provider: {CHAT_CONFIG.app_name}")
+    print(f"API Base URL: {CHAT_CONFIG.base_url}")
+    print(f"Chat Model: {CHAT_CONFIG.model}")
     print("'exit' で終了\n")
 
     messages: list = [SystemMessage(content=SYSTEM_PROMPT)]
@@ -49,12 +44,20 @@ def main() -> None:
         # ストリーミングで応答を表示
         print("AI> ", end="", flush=True)
         full_response = ""
-        for chunk in llm.stream(messages):
-            content = chunk.content
-            if content:
-                print(content, end="", flush=True)
-                full_response += content
-        print()  # 改行
+        try:
+            for chunk in llm.stream(messages):
+                content = chunk.content
+                if content:
+                    print(content, end="", flush=True)
+                    full_response += content
+            print()  # 改行
+        except Exception as exc:
+            print(f"\n[エラー] {CHAT_CONFIG.app_name} に接続できませんでした。")
+            print(f"  base_url={CHAT_CONFIG.base_url}")
+            print("  設定した API URL、APIキー、モデル名を確認してください。")
+            print(f"  詳細: {exc}\n")
+            messages.pop()
+            continue
 
         # アシスタントの応答を履歴に追加
         from langchain_core.messages import AIMessage

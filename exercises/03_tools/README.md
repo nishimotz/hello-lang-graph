@@ -21,8 +21,8 @@ uv run python exercises/03_tools/tool_chat.py
 
 - `@tool` デコレータでツール関数を定義
 - `llm.bind_tools()` でLLMにツールを認識させる
-- `tools_condition` でツール呼び出し有無の分岐を実現
-- ファイル書き込みなど副作用のある操作は `interrupt_before` で一時停止
+- 自前の `should_continue()` でツール呼び出し有無の分岐を実現
+- ファイル書き込みなど副作用のある操作は `input()` で一時停止して確認
 - ユーザーが承認した場合のみ実行される
 
 ## やってみよう

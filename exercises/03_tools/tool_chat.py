@@ -9,11 +9,11 @@ from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
+from hello_lang_graph.config import build_chat_llm, get_chat_config
 
 # ========== State定義 ==========
 
@@ -33,8 +33,11 @@ def web_search(query: str) -> str:
     """DuckDuckGoでWeb検索を行い、結果を返す。"""
     from duckduckgo_search import DDGS
 
-    with DDGS() as ddgs:
-        results = list(ddgs.text(query, max_results=3))
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+    except Exception as exc:
+        return f"検索に失敗しました: {exc}"
     if not results:
         return "検索結果が見つかりませんでした。"
     return "\n\n".join(
@@ -46,11 +49,16 @@ def web_search(query: str) -> str:
 def write_file(filepath: str, content: str) -> str:
     """指定パスにテキストファイルを書き込む。既存ファイルには追記する。"""
     path = Path(filepath).expanduser()
-    mode = "a" if path.exists() else "w"
-    path.write_text(content + "\n", encoding="utf-8") if mode == "w" else path.open(
-        "a", encoding="utf-8"
-    ).write(content + "\n")
-    return f"ファイルに書き込みました: {path}"
+    try:
+        mode = "a" if path.exists() else "w"
+        if mode == "w":
+            path.write_text(content + "\n", encoding="utf-8")
+        else:
+            with path.open("a", encoding="utf-8") as f:
+                f.write(content + "\n")
+        return f"ファイルに書き込みました: {path}"
+    except Exception as exc:
+        return f"ファイル書き込みに失敗しました: {path} ({exc})"
 
 
 @tool
@@ -73,12 +81,8 @@ dangerous_tool_names = {t.name for t in dangerous_tools}
 
 # ========== LLM設定 ==========
 
-llm = ChatOpenAI(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
-    model="gpt-oss-20b",
-    temperature=0.8,
-).bind_tools(all_tools)
+CHAT_CONFIG = get_chat_config()
+llm = build_chat_llm(temperature=0.8).bind_tools(all_tools)
 
 SYSTEM_PROMPT = (
     "あなたは親切なアシスタントです。日本語で応答してください。\n"
@@ -164,6 +168,9 @@ def main() -> None:
     """メインのチャットループ。"""
     print("=== Tool Chat (human-in-the-loop) ===")
     print("ツール: web_search, write_file, read_file")
+    print(f"Provider: {CHAT_CONFIG.app_name}")
+    print(f"API Base URL: {CHAT_CONFIG.base_url}")
+    print(f"Chat Model: {CHAT_CONFIG.model}")
     print("'exit' で終了\n")
 
     memory = MemorySaver()
@@ -185,10 +192,16 @@ def main() -> None:
             print("終了します。")
             break
 
-        result = app.invoke(
-            {"messages": [HumanMessage(content=user_input)]},
-            config=config,
-        )
+        try:
+            result = app.invoke(
+                {"messages": [HumanMessage(content=user_input)]},
+                config=config,
+            )
+        except Exception as exc:
+            print("[エラー] 実行に失敗しました。")
+            print("  API URL、APIキー、モデル名、ネットワーク接続を確認してください。")
+            print(f"  詳細: {exc}\n")
+            continue
 
         thinking = result.get("thinking", "")
         if thinking:
