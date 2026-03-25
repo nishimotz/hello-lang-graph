@@ -77,15 +77,20 @@ make run-01
 
 1. APIキーを設定する
 2. `LLM_PROVIDER=openrouter` を設定する
-3. モデル名を設定する
+3. モデル名を設定する（未設定時のデフォルトは `meta-llama/llama-3.1-8b-instruct`）
 
 ```bash
 export LLM_PROVIDER=openrouter
 export OPENROUTER_API_KEY=your_api_key
-export OPENROUTER_MODEL=openai/gpt-oss-20b:free
+export OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct
 make run-01
+# または: make run-openrouter-01
 # または: uv run python exercises/01_minimal_chat/chat.py
 ```
+
+#### OpenRouter で `404` / 「No endpoints available matching your guardrail…」になるとき
+
+アカウントの [Privacy / Guardrails](https://openrouter.ai/settings/privacy) と、選択したモデルのデータポリシーが一致していないと、利用可能なエンドポイントが 0 件になりこのエラーになります。Privacy で無料モデル（学習利用あり等）を許可する、別モデルに `OPENROUTER_MODEL` を変える、組織や API キー単位の Guardrail を緩める、のいずれかで解消することが多いです。LM Studio と名前を揃えたい場合は `openai/gpt-oss-20b:free` なども試せますが、環境によっては上記制約で使えません。
 
 ## 実演前チェック
 
@@ -184,4 +189,5 @@ make run-01
 - `LM_STUDIO_BASE_URL`: LM Studio の API URL
 - `LM_STUDIO_CHAT_MODEL`: LM Studio 利用時のモデル名
 - `OPENROUTER_API_KEY`: OpenRouter の APIキー
-- `OPENROUTER_MODEL`: OpenRouter 利用時のモデル名
+- `OPENROUTER_MODEL`: OpenRouter 利用時のモデル名（デフォルト `meta-llama/llama-3.1-8b-instruct`）
+- `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME`: OpenRouter 推奨の識別用ヘッダ（任意）

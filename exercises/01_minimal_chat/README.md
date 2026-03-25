@@ -17,8 +17,12 @@
 
 ```bash
 make run-01
+# OpenRouter 利用時は環境変数を付けたうえで上と同じ、または:
+# make run-openrouter-01
 # または: uv run python exercises/01_minimal_chat/chat.py
 ```
+
+OpenRouter で `404` と「guardrail / data policy」の文言が出る場合は、リポジトリ直下 `README.md` の「OpenRouter で 404…」の項を参照してください。
 
 ## ポイント
 

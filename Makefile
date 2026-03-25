@@ -2,7 +2,7 @@ PYTHON := python3
 UV := uv
 
 LLM_PROVIDER ?= lmstudio
-OPENROUTER_MODEL ?= openai/gpt-oss-20b:free
+OPENROUTER_MODEL ?= meta-llama/llama-3.1-8b-instruct
 
 .PHONY: help sync check lint run-01 run-02 run-03 run-04 run-05 \
 	run-openrouter-01 run-openrouter-05 clean-memory show-memory

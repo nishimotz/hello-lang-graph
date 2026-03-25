@@ -41,7 +41,7 @@ def get_chat_config() -> ChatRuntimeConfig:
             model=_env(
                 "OPENROUTER_MODEL",
                 "LLM_CHAT_MODEL",
-                default="openai/gpt-oss-20b:free",
+                default="meta-llama/llama-3.1-8b-instruct",
             ),
             api_key=api_key,
             app_name="OpenRouter",
