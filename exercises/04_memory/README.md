@@ -43,6 +43,11 @@ make run-04
 意味検索は使いません。
 その代わり、「今後の対話に必要な情報をどう整理して残すか」に集中します。
 
+## 注意
+
+- `web_search` 用の **本文フォールバック**（`tool_calls` が空のとき）を Exercise 03 と同じ `hello_lang_graph/tool_fallback.py` 経由で適用しています。
+- 長期記憶ファイルは `memory_store/summary_memory.json` です（`.gitignore` 済み）。手元で中身を確認してみてください。
+
 ## やってみよう
 
 1. 「私の好きな言語はPythonです」など、覚えてほしいことを話す

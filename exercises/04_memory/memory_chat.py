@@ -21,6 +21,7 @@ from hello_lang_graph.memory import (
     save_memory_snapshot,
     update_memory_snapshot,
 )
+from hello_lang_graph.tool_fallback import augment_ai_message_with_fallback
 
 MEMORY_DIR = Path("memory_store")
 MAX_CONTEXT_CHARS = 8000  # 日本語では1文字≈1〜2トークン相当
@@ -44,7 +45,10 @@ llm = build_chat_llm(temperature=0.8)
 
 SYSTEM_PROMPT = (
     "あなたは親切なアシスタントです。日本語で応答してください。\n"
-    "過去の会話サマリやユーザー情報が与えられた場合は、それも参考にしてください。"
+    "過去の会話サマリやユーザー情報が与えられた場合は、それも参考にしてください。\n"
+    "情報検索が必要なら web_search ツールを使います。\n"
+    "すでにツール結果（ToolMessage）が会話に含まれている場合は、"
+    "同じ目的で web_search を繰り返さず、その内容を要約して答えてください。"
 )
 
 # ========== コンテキスト長管理 ==========
@@ -101,6 +105,7 @@ def web_search(query: str) -> str:
 
 all_tools = [web_search]
 llm_with_tools = llm.bind_tools(all_tools)
+FALLBACK_TOOL_NAMES = frozenset(t.name for t in all_tools)
 
 
 # ========== グラフノード ==========
@@ -123,6 +128,8 @@ def chat_node(state: AgentState) -> dict:
 
     full_messages = [SystemMessage(content=system_content)] + messages
     response = llm_with_tools.invoke(full_messages)
+    if isinstance(response, AIMessage):
+        response = augment_ai_message_with_fallback(response, FALLBACK_TOOL_NAMES)
 
     thinking = ""
     if hasattr(response, "additional_kwargs"):

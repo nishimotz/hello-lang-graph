@@ -30,6 +30,7 @@ check:
 		hello_lang_graph/__init__.py \
 		hello_lang_graph/config.py \
 		hello_lang_graph/memory.py \
+		hello_lang_graph/tool_fallback.py \
 		exercises/01_minimal_chat/chat.py \
 		exercises/02_langgraph_state/stateful_chat.py \
 		exercises/03_tools/tool_chat.py \

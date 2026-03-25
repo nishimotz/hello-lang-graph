@@ -17,6 +17,9 @@ uv.lock
 # Memory store (generated at runtime)
 memory_store/
 
+# Demo scratch files
+memo.txt
+
 # IDE
 .idea/
 

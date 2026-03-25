@@ -24,6 +24,7 @@ from hello_lang_graph.memory import (
     save_memory_snapshot,
     update_memory_snapshot,
 )
+from hello_lang_graph.tool_fallback import augment_ai_message_with_fallback
 
 MEMORY_DIR = Path("memory_store")
 MAX_CONTEXT_CHARS = 8000  # 日本語では1文字≈1〜2トークン相当
@@ -49,6 +50,11 @@ SYSTEM_PROMPT = (
     "あなたは Tiny Claw、ユーザーのローカルPCで常駐するAIアシスタントです。\n"
     "日本語で簡潔に応答してください。\n"
     "必要に応じてツールを使ってください。\n"
+    "ファイル操作を頼まれたら write_file / read_file ツールを使います。\n"
+    "情報検索が必要なら web_search ツールを使います。\n"
+    "デスクトップなど特定の場所へ書くときは filepath に ~/Desktop/ファイル名 のようにフルパスを使います。\n"
+    "すでにツール結果（ToolMessage）が会話に含まれている場合は、"
+    "同じ目的で web_search を繰り返さず、その内容を要約して答えてください。\n"
     "保存済みの会話サマリやユーザー情報があれば、それも参考にしてください。"
 )
 
@@ -135,6 +141,7 @@ all_tools = safe_tools + dangerous_tools
 dangerous_tool_names = {t.name for t in dangerous_tools}
 
 llm_with_tools = llm.bind_tools(all_tools)
+FALLBACK_TOOL_NAMES = frozenset(t.name for t in all_tools)
 
 
 # ========== グラフノード ==========
@@ -157,6 +164,8 @@ def chat_node(state: AgentState) -> dict:
 
     full_messages = [SystemMessage(content=system_content)] + messages
     response = llm_with_tools.invoke(full_messages)
+    if isinstance(response, AIMessage):
+        response = augment_ai_message_with_fallback(response, FALLBACK_TOOL_NAMES)
 
     thinking = ""
     if hasattr(response, "additional_kwargs"):
