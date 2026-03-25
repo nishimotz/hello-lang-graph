@@ -4,6 +4,7 @@ LangGraphの StateGraph を使い、明示的な状態管理と
 思考プロセスの保存を行うチャットスクリプト。
 """
 
+import re
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -28,10 +29,33 @@ class AgentState(TypedDict):
 CHAT_CONFIG = get_chat_config()
 llm = build_chat_llm(temperature=0.8)
 
+_THINKING_TAG = re.compile(r"<thinking>(.*?)</thinking>", re.DOTALL)
+
 SYSTEM_PROMPT = (
     "あなたは親切で簡潔に回答するアシスタントです。"
     "日本語で応答してください。"
+    "回答の前に、推論や判断の要点を2〜4文程度で "
+    "<thinking>...</thinking> タグで囲って出力し、その直後に本文を書いてください。"
 )
+
+
+def _thinking_and_display(message: AIMessage) -> tuple[str, str]:
+    """APIの reasoning_content または <thinking> タグから思考と表示用本文を得る。"""
+    content = message.content or ""
+    thinking = ""
+    ak = getattr(message, "additional_kwargs", None) or {}
+    if isinstance(ak, dict):
+        rc = ak.get("reasoning_content")
+        if rc:
+            thinking = str(rc).strip()
+
+    if not thinking:
+        m = _THINKING_TAG.search(content)
+        if m:
+            thinking = m.group(1).strip()
+
+    display = _THINKING_TAG.sub("", content).strip() if _THINKING_TAG.search(content) else content.strip()
+    return thinking, display
 
 
 # ========== グラフノード ==========
@@ -42,10 +66,7 @@ def chat_node(state: AgentState) -> dict:
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
     response = llm.invoke(messages)
 
-    # 思考プロセスを抽出（reasoning_content がある場合）
-    thinking = ""
-    if hasattr(response, "additional_kwargs"):
-        thinking = response.additional_kwargs.get("reasoning_content", "")
+    thinking, _ = _thinking_and_display(response)
 
     return {
         "messages": [response],
@@ -105,15 +126,14 @@ def main() -> None:
             print(f"  詳細: {exc}\n")
             continue
 
-        # 思考プロセスがあれば表示
-        thinking = result.get("thinking", "")
-        if thinking:
-            print(f"[思考] {thinking[:200]}...")
-
-        # 最後のAIメッセージを表示
+        # 思考プロセスがあれば表示（タグは本文から除いて表示）
         last_message = result["messages"][-1]
         if isinstance(last_message, AIMessage):
-            print(f"AI> {last_message.content}")
+            t, display = _thinking_and_display(last_message)
+            if t:
+                snippet = t if len(t) <= 200 else f"{t[:200]}..."
+                print(f"[思考] {snippet}")
+            print(f"AI> {display}")
         print()
 
 

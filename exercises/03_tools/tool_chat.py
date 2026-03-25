@@ -4,8 +4,11 @@ DuckDuckGo検索とファイル書き込みツールを使い、
 危険な操作の前にユーザー確認を入れるエージェント。
 """
 
+import json
+import re
 from pathlib import Path
 from typing import Annotated, TypedDict
+from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
@@ -32,7 +35,7 @@ class AgentState(TypedDict):
 @tool
 def web_search(query: str) -> str:
     """DuckDuckGoでWeb検索を行い、結果を返す。"""
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 
     try:
         with DDGS() as ddgs:
@@ -89,17 +92,76 @@ SYSTEM_PROMPT = (
     "あなたは親切なアシスタントです。日本語で応答してください。\n"
     "必要に応じてツールを使ってください。\n"
     "ファイル操作を頼まれたら write_file / read_file ツールを使います。\n"
-    "情報検索が必要なら web_search ツールを使います。"
+    "情報検索が必要なら web_search ツールを使います。\n"
+    "すでにツール結果（ToolMessage）が会話に含まれている場合は、"
+    "同じ目的で web_search を繰り返さず、その内容を要約して答えてください。"
 )
 
 
 # ========== グラフノード ==========
 
 
+_TAG_TOOL_RE = re.compile(
+    r"<(?P<name>web_search|read_file|write_file)>\s*(?P<body>\{.*?\})\s*</(?P=name)>",
+    re.DOTALL,
+)
+_COMMENTARY_RE = re.compile(r"(?s)<\|channel\|>commentary.*$")
+
+
+def _parse_fallback_tool_calls(content: str) -> list[dict]:
+    """本文から擬似ツール呼び出しを抽出する（互換性フォールバック）。"""
+    text = _COMMENTARY_RE.sub("", content).strip()
+    calls: list[dict] = []
+
+    for m in _TAG_TOOL_RE.finditer(text):
+        name = m.group("name")
+        try:
+            args = json.loads(m.group("body"))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(args, dict):
+            calls.append(
+                {
+                    "id": f"fallback_{uuid4().hex[:8]}",
+                    "type": "tool_call",
+                    "name": name,
+                    "args": args,
+                }
+            )
+
+    if not calls:
+        try:
+            obj = json.loads(text)
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, dict):
+            name = obj.get("tool") or obj.get("name")
+            args = obj.get("args") or obj.get("arguments")
+            if name in {"web_search", "read_file", "write_file"} and isinstance(args, dict):
+                calls.append(
+                    {
+                        "id": f"fallback_{uuid4().hex[:8]}",
+                        "type": "tool_call",
+                        "name": name,
+                        "args": args,
+                    }
+                )
+    return calls
+
+
 def chat_node(state: AgentState) -> dict:
     """LLMを呼び出すノード。"""
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
     response = llm.invoke(messages)
+    if isinstance(response, AIMessage) and not response.tool_calls:
+        fallback_calls = _parse_fallback_tool_calls(response.content or "")
+        if fallback_calls:
+            # ツール呼び出し専用レスポンスへ変換して既存フローに接続する
+            response = AIMessage(
+                content="",
+                tool_calls=fallback_calls,
+                additional_kwargs=getattr(response, "additional_kwargs", {}),
+            )
     thinking = ""
     if hasattr(response, "additional_kwargs"):
         thinking = response.additional_kwargs.get("reasoning_content", "")
@@ -178,7 +240,10 @@ def main() -> None:
     graph = build_graph()
     app = graph.compile(checkpointer=memory)
 
-    config = {"configurable": {"thread_id": "session-1"}}
+    config = {
+        "configurable": {"thread_id": "session-1"},
+        "recursion_limit": 24,
+    }
 
     while True:
         try:

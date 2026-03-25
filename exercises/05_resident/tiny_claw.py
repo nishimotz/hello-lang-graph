@@ -89,7 +89,7 @@ def summarize_if_needed(state: AgentState) -> list:
 @tool
 def web_search(query: str) -> str:
     """DuckDuckGoでWeb検索を行い、結果を返す。"""
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 
     try:
         with DDGS() as ddgs:
@@ -277,7 +277,10 @@ async def main() -> None:
     graph = build_graph()
     app = graph.compile(checkpointer=memory)
 
-    config = {"configurable": {"thread_id": "session-1"}}
+    config = {
+        "configurable": {"thread_id": "session-1"},
+        "recursion_limit": 24,
+    }
 
     while True:
         try:
