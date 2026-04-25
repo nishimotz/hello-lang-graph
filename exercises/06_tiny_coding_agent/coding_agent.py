@@ -161,7 +161,7 @@ SYSTEM_PROMPT = (
     "2. 生成したコードを `run_lint` で検証する\n"
     "3. エラーがあれば `fix_code` で修正する\n"
     "4. 修正後は再度 `run_lint` で検証する\n"
-    "5. lint が通るまで繰り返す（最大3回）\n"
+    "5. lint が通るまで繰り返す\n"
     "6. 最終的なコードを表示する"
 )
 
@@ -215,9 +215,17 @@ def _run_tools(state: CodingState) -> dict:
     results = []
     for tc in last.tool_calls:
         tool_fn = tool_map.get(tc["name"])
-        if tool_fn:
-            result = tool_fn.invoke(tc["args"])
-            results.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
+        if not tool_fn:
+            available = ", ".join(sorted(tool_map))
+            results.append(
+                ToolMessage(
+                    content=f"Unknown tool: {tc['name']}. Available: {available}",
+                    tool_call_id=tc["id"],
+                )
+            )
+            continue
+        result = tool_fn.invoke(tc["args"])
+        results.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
     return {"messages": results}
 
 
