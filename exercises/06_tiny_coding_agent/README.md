@@ -8,10 +8,6 @@
 ```
 You> CSVを読んで各列の合計を計算する関数
 [思考] 要件を分析中...
-[ツール] generate_code → コード生成
-[ツール] run_lint → mypy: 2件, ruff(ANN): 1件
-[ツール] fix_code → 修正
-[ツール] run_lint → mypy: OK, ruff(ANN): OK
 
 AI> 型ヒント付きのコードが完成しました:
 ```python
