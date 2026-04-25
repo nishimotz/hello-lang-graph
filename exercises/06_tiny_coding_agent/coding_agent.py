@@ -97,9 +97,16 @@ def run_lint(code: str) -> str:
                 results.append("mypy: OK")
             else:
                 lines = [l for l in mypy_out.split("\n") if "check_code.py" in l]
-                results.append(f"mypy: {len(lines)}件")
                 if lines:
+                    results.append(f"mypy: {len(lines)}件")
                     results.append("  " + "\n  ".join(lines[:10]))
+                else:
+                    fallback = [l for l in mypy_out.split("\n") if l.strip()]
+                    if fallback:
+                        results.append("mypy: エラー")
+                        results.append("  " + "\n  ".join(fallback[:10]))
+                    else:
+                        results.append("mypy: エラー（出力なし）")
         except FileNotFoundError:
             results.append("mypy: 未インストール")
         except subprocess.TimeoutExpired:
