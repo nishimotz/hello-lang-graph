@@ -4,6 +4,7 @@ LangGraph の ReAct ループで「要求 → コード生成 → 静的解析 �
 自動で回すエージェント。型ヒントが必須の Python サブセットを対象とする。
 """
 
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -94,15 +95,6 @@ def run_lint(code: str) -> str:
     結果をまとめて返す。変数アノテーションの網羅的な検証は行わない。
     Any の簡易検査も行う。"""
     checked_code = _extract_python_code(code)
-    results = []
-
-    # Any の簡易検査
-    if re.search(r"\bAny\b", checked_code):
-        results.append("Any検査: 失敗（Anyの使用は禁止されています）")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpfile = Path(tmpdir) / "check_code.py"
-        tmpfile.write_text(checked_code, encoding="utf-8")
     results = []
 
     # Any の簡易検査
