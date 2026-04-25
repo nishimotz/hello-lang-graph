@@ -14,7 +14,7 @@
 10. 空コンテナの型付き初期化は通常の変数・ローカル変数では `items: list[int] = []` のように1行で書く。dataclass フィールドでは可変デフォルト値を避け、`field(default_factory=list)` / `field(default_factory=dict)` を使うこと
 11. 関数のデフォルト引数に可変オブジェクト（`list`, `dict`, `set`）を使わないこと（例: `def f(x: list[int] = [])` は禁止）
 12. `eval`, `exec`, `compile`, `__import__`, `getattr`, `setattr`, `delattr` の使用を禁止
-13. トップレベルに実行コードを書かないこと。関数定義・クラス定義・import・定数定義のみ許可
+13. トップレベルに実行コードを書かないこと。関数定義・クラス定義・import・定数定義のみ許可。ただし `if __name__ == "__main__":` ブロックは例外として許可
 14. 1関数あたりの循環複雑度（McCabe complexity）は4以下にすること。複雑な処理はヘルパー関数に分割すること
 15. 必ず `if __name__ == "__main__":` ブロックを含め、生成した関数の使用例を実行できる形で示すこと
 

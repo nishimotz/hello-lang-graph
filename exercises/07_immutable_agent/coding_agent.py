@@ -113,6 +113,13 @@ def _check_toplevel(code: str) -> list[str]:
             ast.ClassDef, ast.Assign, ast.AnnAssign,
         )):
             continue
+        # モジュール docstring は許可
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            continue
         if isinstance(node, ast.If):
             test = node.test
             if (
@@ -131,6 +138,15 @@ def _check_toplevel(code: str) -> list[str]:
     return violations
 
 
+def _collect_target_names(target: ast.expr) -> list[ast.Name]:
+    """代入ターゲットから Name ノードを再帰的に収集する（タプル展開に対応）。"""
+    if isinstance(target, ast.Name):
+        return [target]
+    if isinstance(target, ast.Tuple):
+        return [name for elt in target.elts for name in _collect_target_names(elt)]
+    return []
+
+
 def _check_immutable(code: str) -> list[str]:
     """イミュータブル制約を AST で検査する。"""
     try:
@@ -147,13 +163,19 @@ def _check_immutable(code: str) -> list[str]:
             op_name = type(node.op).__name__
             violations.append(f"  行{lineno}: 累積代入 ({op_name}) は禁止")
 
-        # 属性・添字への代入
+        # 属性・添字への代入（Assign / AnnAssign 両方）
         elif isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Attribute):
                     violations.append(f"  行{lineno}: 属性への代入 (.{target.attr}) は禁止")
                 elif isinstance(target, ast.Subscript):
                     violations.append(f"  行{lineno}: 添字への代入は禁止")
+
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Attribute):
+                violations.append(f"  行{lineno}: 属性への代入 (.{node.target.attr}) は禁止")
+            elif isinstance(node.target, ast.Subscript):
+                violations.append(f"  行{lineno}: 添字への代入は禁止")
 
         # del 文
         elif isinstance(node, ast.Delete):
@@ -181,15 +203,15 @@ def _check_immutable(code: str) -> list[str]:
             elif isinstance(child, ast.AnnAssign) and child.value is not None:
                 targets = [child.target]
             for target in targets:
-                if isinstance(target, ast.Name):
-                    child_lineno: int | str = getattr(child, "lineno", "?")
-                    if target.id in assigned:
+                child_lineno: int | str = getattr(child, "lineno", "?")
+                for name_node in _collect_target_names(target):
+                    if name_node.id in assigned:
                         violations.append(
-                            f"  行{child_lineno}: 変数 '{target.id}' への再代入は禁止"
-                            f" (最初の代入: 行{assigned[target.id]})"
+                            f"  行{child_lineno}: 変数 '{name_node.id}' への再代入は禁止"
+                            f" (最初の代入: 行{assigned[name_node.id]})"
                         )
                     else:
-                        assigned[target.id] = child_lineno
+                        assigned[name_node.id] = child_lineno
 
     return violations
 
@@ -306,12 +328,21 @@ def run_lint(code: str) -> str:
 _OUTPUT_DIR = Path(__file__).parent / "output"
 
 
+def _next_code_number(output_dir: Path) -> int:
+    """output_dir 内の code_NNN.py の最大番号 + 1 を返す。"""
+    nums = [
+        int(m.group(1))
+        for f in output_dir.glob("code_*.py")
+        if (m := re.match(r"code_(\d+)\.py", f.name))
+    ]
+    return max(nums, default=0) + 1
+
+
 @tool
 def save_code(code: str) -> str:
     """lint が通ったコードをファイルに保存する。連番ファイル名で output/ に保存する。"""
     _OUTPUT_DIR.mkdir(exist_ok=True)
-    existing = sorted(_OUTPUT_DIR.glob("code_*.py"))
-    next_num = len(existing) + 1
+    next_num = _next_code_number(_OUTPUT_DIR)
     out_path = _OUTPUT_DIR / f"code_{next_num:03d}.py"
     out_path.write_text(_extract_python_code(code), encoding="utf-8")
     rel = out_path.relative_to(Path.cwd()) if out_path.is_relative_to(Path.cwd()) else out_path

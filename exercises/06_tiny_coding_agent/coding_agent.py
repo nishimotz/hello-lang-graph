@@ -100,6 +100,13 @@ def _check_toplevel(code: str) -> list[str]:
             ast.ClassDef, ast.Assign, ast.AnnAssign,
         )):
             continue
+        # モジュール docstring は許可
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            continue
         if isinstance(node, ast.If):
             test = node.test
             if (
@@ -143,8 +150,8 @@ def generate_code(requirement: str) -> str:
 @tool
 def run_lint(code: str) -> str:
     """型ヒントを含むPythonコードに対して静的解析を実行する。
-    mypy（型チェック）、ruff ANN/B006/S（関数アノテーション・可変デフォルト引数・
-    動的実行禁止）、トップレベル実行コード禁止チェックの結果をまとめて返す。"""
+    mypy（型チェック）、ruff ANN/B006/C/S/UP（関数アノテーション・可変デフォルト引数・
+    複雑度・動的実行禁止・旧式型ヒント）、トップレベル実行コード禁止チェックの結果をまとめて返す。"""
     checked_code = _extract_python_code(code)
     results = []
 
@@ -223,12 +230,21 @@ def run_lint(code: str) -> str:
 _OUTPUT_DIR = Path(__file__).parent / "output"
 
 
+def _next_code_number(output_dir: Path) -> int:
+    """output_dir 内の code_NNN.py の最大番号 + 1 を返す。"""
+    nums = [
+        int(m.group(1))
+        for f in output_dir.glob("code_*.py")
+        if (m := re.match(r"code_(\d+)\.py", f.name))
+    ]
+    return max(nums, default=0) + 1
+
+
 @tool
 def save_code(code: str) -> str:
     """lint が通ったコードをファイルに保存する。連番ファイル名で output/ に保存する。"""
     _OUTPUT_DIR.mkdir(exist_ok=True)
-    existing = sorted(_OUTPUT_DIR.glob("code_*.py"))
-    next_num = len(existing) + 1
+    next_num = _next_code_number(_OUTPUT_DIR)
     out_path = _OUTPUT_DIR / f"code_{next_num:03d}.py"
     out_path.write_text(_extract_python_code(code), encoding="utf-8")
     rel = out_path.relative_to(Path.cwd()) if out_path.is_relative_to(Path.cwd()) else out_path

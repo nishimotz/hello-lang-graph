@@ -73,7 +73,7 @@ You>
 | ツール | 説明 |
 |--------|------|
 | `generate_code` | 要件に基づき型ヒント必須Pythonコードを生成 |
-| `run_lint` | mypy + ruff(ANN/B006/S) + トップレベル検査。結果をまとめて返す |
+| `run_lint` | mypy + ruff(ANN/B006/C/S/UP) + トップレベル検査。結果をまとめて返す |
 | `fix_code` | lint エラーを元にコードを修正 |
 
 ## 型ヒント必須サブセットのルール
