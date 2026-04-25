@@ -66,6 +66,7 @@ class CodingState(TypedDict):
 
 _CODE_BLOCK_RE = re.compile(r"```(?:python)?\s*\n(?P<code>.*?)```", re.DOTALL)
 
+
 def _extract_python_code(text: str) -> str:
     """MarkdownコードブロックからPythonコードを抽出する。
     コードブロックがない場合は全文をそのまま返す。"""
