@@ -1,7 +1,7 @@
-"""Exercise 06: 型ヒント必須Pythonを生成する Tiny Coding Agent
+"""Exercise 07: イミュータブル制約付きPythonを生成する Tiny Coding Agent
 
-LangGraph の ReAct ループで「要求 → コード生成 → 静的解析 → 修正」を
-自動で回すエージェント。型ヒントが必須の Python サブセットを対象とする。
+Exercise 06 の型ヒント必須エージェントに「イミュータブル制約」を追加。
+再代入・ミューテーションを禁止し、純粋関数スタイルを強制する。
 """
 
 import ast
@@ -21,11 +21,11 @@ from langgraph.graph.message import add_messages
 from hello_lang_graph.config import build_chat_llm, get_chat_config
 from hello_lang_graph.tool_fallback import augment_ai_message_with_fallback
 
-# ========== 型ヒント必須サブセットのプロンプト ==========
+# ========== サブセットのプロンプト ==========
 
 SUBSET_RULES = (
-    "## 型ヒント必須サブセットのルール\n\n"
-    "あなたは型ヒントが必須のPythonコードを生成するアシスタントです。\n"
+    "## イミュータブル制約付きサブセットのルール\n\n"
+    "あなたはイミュータブルな値のみを使う純粋関数スタイルのPythonコードを生成するアシスタントです。\n"
     "以下のルールに従ってください:\n\n"
     "1. 全ての関数に引数と戻り値の型ヒントを付けること（`run_lint` で自動検証）\n"
     "2. 変数にも可能な限り型ヒントを付けること（`name: Type = value` の形式。"
@@ -46,14 +46,21 @@ SUBSET_RULES = (
     "13. トップレベルに実行コードを書かないこと。"
     "関数定義・クラス定義・import・定数定義のみ許可（`run_lint` で自動検証）\n"
     "14. 1関数あたりの循環複雑度は4以下にすること。"
-    "複雑な処理はヘルパー関数に分割すること（`run_lint` で自動検証）\n\n"
+    "複雑な処理はヘルパー関数に分割すること（`run_lint` で自動検証）\n"
+    "15. 変数への再代入禁止。一度束縛した名前に別の値を代入してはいけない（`run_lint` で自動検証）\n"
+    "16. `+=` `-=` などの累積代入禁止（`run_lint` で自動検証）\n"
+    "17. オブジェクトの属性・添字への代入禁止（`obj.x = v`, `d[k] = v` など）（`run_lint` で自動検証）\n"
+    "18. `del` 文禁止（`run_lint` で自動検証）\n"
+    "19. `.append()` `.extend()` `.update()` `.add()` `.pop()` `.clear()` `.sort()` `.reverse()` など"
+    "ミューテーションメソッドの呼び出し禁止（`run_lint` で自動検証）\n"
+    "20. リスト・辞書の構築には内包表記や `tuple()` `frozenset()` を使うこと\n\n"
     "コードブロックは ```python から始めてください。\n"
     "生成したコードは `run_lint` ツールで検証できるように、"
     "コードブロックの中身だけでなく、ファイルとして保存可能な形式で出力してください。"
 )
 
 LINT_SYSTEM_PROMPT = (
-    "あなたは型ヒントの正確さをチェックするアシスタントです。\n"
+    "あなたはイミュータブル制約と型ヒントの正確さをチェックするアシスタントです。\n"
     "与えられた lint エラーを分析し、修正後のコードを提案してください。\n"
     "エラーがない場合は「問題ありません」とだけ答えてください。\n"
     + SUBSET_RULES
@@ -75,6 +82,12 @@ class CodingState(TypedDict):
 
 
 _CODE_BLOCK_RE = re.compile(r"```(?:python)?\s*\n(?P<code>.*?)```", re.DOTALL)
+
+_MUTATION_METHODS: frozenset[str] = frozenset({
+    "append", "extend", "insert", "remove", "pop", "clear",
+    "update", "add", "discard", "sort", "reverse",
+    "setdefault", "__setitem__", "__delitem__",
+})
 
 
 def _extract_python_code(text: str) -> str:
@@ -118,6 +131,69 @@ def _check_toplevel(code: str) -> list[str]:
     return violations
 
 
+def _check_immutable(code: str) -> list[str]:
+    """イミュータブル制約を AST で検査する。"""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return [f"構文エラー: {e}"]
+    violations: list[str] = []
+
+    for node in ast.walk(tree):
+        lineno: int | str = getattr(node, "lineno", "?")
+
+        # 累積代入 (+=, -=, etc.)
+        if isinstance(node, ast.AugAssign):
+            op_name = type(node.op).__name__
+            violations.append(f"  行{lineno}: 累積代入 ({op_name}) は禁止")
+
+        # 属性・添字への代入
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Attribute):
+                    violations.append(f"  行{lineno}: 属性への代入 (.{target.attr}) は禁止")
+                elif isinstance(target, ast.Subscript):
+                    violations.append(f"  行{lineno}: 添字への代入は禁止")
+
+        # del 文
+        elif isinstance(node, ast.Delete):
+            violations.append(f"  行{lineno}: del 文は禁止")
+
+        # ミューテーションメソッド呼び出し
+        elif isinstance(node, ast.Call):
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in _MUTATION_METHODS
+            ):
+                violations.append(
+                    f"  行{lineno}: ミューテーションメソッド .{node.func.attr}() は禁止"
+                )
+
+    # 関数スコープ内の変数再代入
+    for func in ast.walk(tree):
+        if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        assigned: dict[str, int | str] = {}
+        for child in ast.walk(func):
+            targets: list[ast.expr] = []
+            if isinstance(child, ast.Assign):
+                targets = list(child.targets)
+            elif isinstance(child, ast.AnnAssign) and child.value is not None:
+                targets = [child.target]
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    child_lineno: int | str = getattr(child, "lineno", "?")
+                    if target.id in assigned:
+                        violations.append(
+                            f"  行{child_lineno}: 変数 '{target.id}' への再代入は禁止"
+                            f" (最初の代入: 行{assigned[target.id]})"
+                        )
+                    else:
+                        assigned[target.id] = child_lineno
+
+    return violations
+
+
 def _invoke_llm(label: str, llm_instance: object, messages: list) -> object:
     """LLM を呼び出し、ラベルと所要時間を表示する。"""
     preview = str(getattr(messages[-1], "content", ""))[:60].replace("\n", " ")
@@ -131,7 +207,7 @@ def _invoke_llm(label: str, llm_instance: object, messages: list) -> object:
 
 @tool
 def generate_code(requirement: str) -> str:
-    """与えられた要件に基づいて型ヒント必須のPythonコードを生成する。"""
+    """与えられた要件に基づいてイミュータブル制約付きPythonコードを生成する。"""
     with open(PROMPT_DIR / "generate.txt", encoding="utf-8") as f:
         prompt_template = f.read()
     _llm = build_chat_llm(temperature=0.3)
@@ -142,11 +218,10 @@ def generate_code(requirement: str) -> str:
 
 @tool
 def run_lint(code: str) -> str:
-    """型ヒントを含むPythonコードに対して静的解析を実行する。
-    mypy（型チェック）、ruff ANN/B006/S（関数アノテーション・可変デフォルト引数・
-    動的実行禁止）、トップレベル実行コード禁止チェックの結果をまとめて返す。"""
+    """イミュータブル制約付きPythonコードに対して静的解析を実行する。
+    mypy、ruff ANN/B006/C/S、トップレベル禁止、イミュータブル制約チェックの結果をまとめて返す。"""
     checked_code = _extract_python_code(code)
-    results = []
+    results: list[str] = []
 
     # Any の簡易検査
     if re.search(r"\bAny\b", checked_code):
@@ -159,6 +234,14 @@ def run_lint(code: str) -> str:
         results.extend(toplevel_violations)
     else:
         results.append("トップレベル検査: OK")
+
+    # イミュータブル制約
+    immutable_violations = _check_immutable(checked_code)
+    if immutable_violations:
+        results.append(f"イミュータブル検査: {len(immutable_violations)}件")
+        results.extend(immutable_violations[:10])
+    else:
+        results.append("イミュータブル検査: OK")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfile = Path(tmpdir) / "check_code.py"
@@ -192,7 +275,7 @@ def run_lint(code: str) -> str:
         except subprocess.TimeoutExpired:
             results.append("mypy: タイムアウト")
 
-        # ruff (ANN + B006 + S)
+        # ruff (ANN + B006 + C + S)
         try:
             ruff_result = subprocess.run(
                 [
@@ -247,7 +330,7 @@ def fix_code(code: str, lint_results: str) -> str:
     """lint結果を元にコードを修正する。"""
     _llm = build_chat_llm(temperature=0.2)
     prompt = (
-        f"以下のPythonコードは型ヒントのチェックでエラーが出ています。\n"
+        f"以下のPythonコードは lint チェックでエラーが出ています。\n"
         f"修正後のコード全体を ```python ブロックで返してください。\n\n"
         f"## lint結果\n{lint_results}\n\n"
         f"## 現在のコード\n```python\n{code}\n```"
@@ -266,7 +349,7 @@ CHAT_CONFIG = get_chat_config()
 llm = build_chat_llm(temperature=0.3).bind_tools(all_tools)
 
 SYSTEM_PROMPT = (
-    "あなたは型ヒント必須Pythonコードを生成する Tiny Coding Agent です。\n"
+    "あなたはイミュータブル制約付きPythonコードを生成する Tiny Coding Agent です。\n"
     "日本語で応答してください。\n\n"
     + SUBSET_RULES + "\n\n"
     "ワークフロー:\n"
@@ -364,8 +447,8 @@ def _print_tool_result(tool_name: str, content: str) -> None:
 def main() -> None:
     """メインのチャットループ。"""
     print("=" * 50)
-    print("  Tiny Coding Agent")
-    print("  型ヒント必須Pythonコード生成エージェント")
+    print("  Tiny Coding Agent — Immutable Edition")
+    print("  イミュータブル制約付きPythonコード生成エージェント")
     print("=" * 50)
     print(f"Provider: {CHAT_CONFIG.app_name}")
     print(f"API Base URL: {CHAT_CONFIG.base_url}")

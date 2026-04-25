@@ -147,6 +147,7 @@ make run-01
 | 04 | `exercises/04_memory/` | 要約メモリ + 構造化メモ | `memory_chat.py` |
 | 05 | `exercises/05_resident/` | 常駐ループ完成版 | `tiny_claw.py` |
 | 06 | `exercises/06_tiny_coding_agent/` | 型ヒント必須Python生成エージェント | `coding_agent.py` |
+| 07 | `exercises/07_immutable_agent/` | イミュータブル制約付きPython生成エージェント | `coding_agent.py` |
 
 各 Exercise の進め方：
 
