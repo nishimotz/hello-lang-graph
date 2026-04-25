@@ -371,6 +371,7 @@ def main() -> None:
     print(f"API Base URL: {CHAT_CONFIG.base_url}")
     print(f"Chat Model: {CHAT_CONFIG.model}")
     print("ツール: generate_code, run_lint, fix_code, save_code")
+    print("複数行入力: 最後に '.' だけの行で送信")
     print("'exit' で終了\n")
 
     memory = MemorySaver()
@@ -384,16 +385,30 @@ def main() -> None:
 
     while True:
         try:
-            user_input = input("You> ").strip()
+            first_line = input("You> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n終了します。")
             break
 
-        if not user_input:
+        if not first_line:
             continue
-        if user_input.lower() == "exit":
+        if first_line.lower() == "exit":
             print("終了します。")
             break
+
+        if first_line == ".":
+            continue
+
+        lines: list[str] = [first_line]
+        while True:
+            try:
+                line = input("... ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if line == ".":
+                break
+            lines.append(line)
+        user_input = "\n".join(lines)
 
         try:
             last_ai_msg: AIMessage | None = None
