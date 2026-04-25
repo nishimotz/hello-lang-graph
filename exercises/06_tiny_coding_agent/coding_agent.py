@@ -58,12 +58,20 @@ class CodingState(TypedDict):
     """コーディングエージェントの状態。"""
     messages: Annotated[list, add_messages]
     thinking: str
-    iteration: int
-    current_code: str
-    lint_results: str
 
 
 # ========== ツール定義 ==========
+
+
+_CODE_BLOCK_RE = re.compile(r"```(?:python)?\s*\n(?P<code>.*?)```", re.DOTALL)
+
+def _extract_python_code(text: str) -> str:
+    """MarkdownコードブロックからPythonコードを抽出する。
+    コードブロックがない場合は全文をそのまま返す。"""
+    match = _CODE_BLOCK_RE.search(text)
+    if match:
+        return match.group("code").strip()
+    return text.strip()
 
 
 @tool
@@ -83,11 +91,27 @@ def generate_code(requirement: str) -> str:
 def run_lint(code: str) -> str:
     """型ヒントを含むPythonコードに対して静的解析を実行する。
     mypy（型チェック）と ruff ANN（関数の引数・戻り値アノテーション）の
-    結果をまとめて返す。変数アノテーションの網羅的な検証は行わない。"""
+    結果をまとめて返す。変数アノテーションの網羅的な検証は行わない。
+    Any の簡易検査も行う。"""
+    checked_code = _extract_python_code(code)
     results = []
+
+    # Any の簡易検査
+    if re.search(r"\bAny\b", checked_code):
+        results.append("Any検査: 失敗（Anyの使用は禁止されています）")
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfile = Path(tmpdir) / "check_code.py"
-        tmpfile.write_text(code, encoding="utf-8")
+        tmpfile.write_text(checked_code, encoding="utf-8")
+    results = []
+
+    # Any の簡易検査
+    if re.search(r"\bAny\b", checked_code):
+        results.append("Any検査: 失敗（Anyの使用は禁止されています）")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfile = Path(tmpdir) / "check_code.py"
+        tmpfile.write_text(checked_code, encoding="utf-8")
 
         # mypy
         try:
