@@ -93,6 +93,31 @@ You>
 
 ## 実行
 
+**OpenRouter（デフォルト設定例）:**
+```bash
+# .env に以下を設定
+export LLM_PROVIDER=openrouter
+export OPENROUTER_API_KEY=sk-or-...
+export OPENROUTER_MODEL=deepseek/deepseek-v4-flash
+```
+
+**Ollama Cloud:**
+```bash
+# .env に以下を設定
+export LLM_PROVIDER=lmstudio
+export LM_STUDIO_BASE_URL=https://ollama.com/v1
+export OPENAI_API_KEY=your_ollama_api_key
+export LM_STUDIO_CHAT_MODEL=deepseek-v4-flash:cloud  # ollama.com/api/tags で確認
+```
+
+**LM Studio（ローカル）:**
+```bash
+# .env に以下を設定
+export LLM_PROVIDER=lmstudio
+export LM_STUDIO_BASE_URL=http://localhost:1234/v1
+export LM_STUDIO_CHAT_MODEL=your-model-name
+```
+
 ```bash
 make run-06
 # または: uv run python exercises/06_tiny_coding_agent/coding_agent.py
@@ -103,6 +128,7 @@ make run-06
 ### 基本: シンプルな関数
 ```
 整数のリストを受け取って合計と平均を返す関数
+文字列を受け取って、数字のみなら int、小数点を含むなら float、それ以外は str で返す関数
 ```
 
 ### 中級: データ構造
@@ -120,11 +146,79 @@ CSVファイルを読んで、各列のデータ型を推測する関数
 このコードを型ヒント付きに直して: [エラーが出るコードを貼る]
 ```
 
+## ReAct パターン
+
+このエージェントは **ReAct（Reasoning + Acting）** パターンで動いている。
+
+```
+[思考] 何をすべきか判断
+  ↓
+[行動] ツールを呼ぶ
+  ↓
+[観察] ツール結果を受け取る
+  ↓
+[思考] 結果を踏まえて次を判断
+  ↓
+  ... 繰り返し ...
+  ↓
+[回答] ループを終了して応答
+```
+
+| ReAct | このコードでの対応 |
+|---|---|
+| 思考 | `chat_node` で LLM が次のツールを決める |
+| 行動 | `tool_calls` にツール名と引数が入る |
+| 観察 | `_run_tools` が実行して `ToolMessage` を返す |
+| 思考 | 再び `chat_node` に戻って結果を評価 |
+| 回答 | ツール呼び出しなしで返答 → `should_continue` が `END` |
+
+`save_code` の後にもう一度 LLM が動くのは、保存結果（観察）を受け取った LLM が「ループを終了して回答する」フェーズに入るため。
+
 ## ポイント
 
 - LLM は型ヒントの正確さに弱い。`run_lint` で検証してフィードバックループを回す
 - `run_lint` は mypy と ruff の両方を実行。後で pyright などを追加してもツールは同じ
 - 自分でプロンプト (`prompts/generate.txt`) を編集すると生成品質が変わる
+
+## 循環複雑度（McCabe Complexity）
+
+循環複雑度はコードの分岐の多さを数値化したもの。`if`・`elif`・`for`・`while`・`except` などが1つ増えるたびに+1される。
+
+| 複雑度 | 目安 |
+|---|---|
+| 1 | 分岐なし（直線的なコード） |
+| 2〜4 | シンプル・テストしやすい |
+| 5〜7 | やや複雑 |
+| 8以上 | 複雑・分割を検討 |
+
+このエージェントは **複雑度4以下** を強制している。`if/elif/else` が3つ重なるだけで超えるので、LLM はヘルパー関数に分割せざるを得ない。
+
+```python
+# 複雑度5（アウト）
+def parse(s: str) -> int | float | str:
+    if s.isdigit():        # +1
+        return int(s)
+    elif "." in s:         # +1
+        try:               # +1
+            return float(s)
+        except ValueError: # +1
+            return s
+    else:                  # +1
+        return s
+
+# 複雑度2+2（OK）— ヘルパーに分割
+def _is_float(s: str) -> bool:  # 複雑度2
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+def parse(s: str) -> int | float | str:  # 複雑度2
+    if s.isdigit():
+        return int(s)
+    return float(s) if _is_float(s) else s
+```
 
 ## 制限事項
 

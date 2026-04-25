@@ -8,6 +8,7 @@ import ast
 import re
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Annotated, TypedDict
 
@@ -43,7 +44,9 @@ SUBSET_RULES = (
     "12. `eval`, `exec`, `compile`, `__import__`, `getattr`, `setattr`, `delattr` の"
     "使用を禁止すること（`run_lint` で自動検証）\n"
     "13. トップレベルに実行コードを書かないこと。"
-    "関数定義・クラス定義・import・定数定義のみ許可（`run_lint` で自動検証）\n\n"
+    "関数定義・クラス定義・import・定数定義のみ許可（`run_lint` で自動検証）\n"
+    "14. 1関数あたりの循環複雑度は4以下にすること。"
+    "複雑な処理はヘルパー関数に分割すること（`run_lint` で自動検証）\n\n"
     "コードブロックは ```python から始めてください。\n"
     "生成したコードは `run_lint` ツールで検証できるように、"
     "コードブロックの中身だけでなく、ファイルとして保存可能な形式で出力してください。"
@@ -115,17 +118,26 @@ def _check_toplevel(code: str) -> list[str]:
     return violations
 
 
+def _invoke_llm(label: str, llm_instance: object, messages: list) -> object:
+    """LLM を呼び出し、ラベルと所要時間を表示する。"""
+    preview = str(getattr(messages[-1], "content", ""))[:60].replace("\n", " ")
+    print(f"[LLM 推論中... ({label}) {preview}]")
+    t0 = time.monotonic()
+    response = llm_instance.invoke(messages)  # type: ignore[union-attr]
+    elapsed = time.monotonic() - t0
+    print(f"[LLM 完了 {elapsed:.1f}s]")
+    return response
+
+
 @tool
 def generate_code(requirement: str) -> str:
     """与えられた要件に基づいて型ヒント必須のPythonコードを生成する。"""
     with open(PROMPT_DIR / "generate.txt", encoding="utf-8") as f:
         prompt_template = f.read()
-    llm = build_chat_llm(temperature=0.3)
-    response = llm.invoke([
-        SystemMessage(content=prompt_template),
-        HumanMessage(content=requirement),
-    ])
-    return response.content
+    _llm = build_chat_llm(temperature=0.3)
+    msgs = [SystemMessage(content=prompt_template), HumanMessage(content=requirement)]
+    response = _invoke_llm("generate_code", _llm, msgs)
+    return response.content  # type: ignore[union-attr]
 
 
 @tool
@@ -185,18 +197,19 @@ def run_lint(code: str) -> str:
             ruff_result = subprocess.run(
                 [
                     "uv", "run", "ruff", "check",
-                    "--select", "ANN,B006,S",
+                    "--select", "ANN,B006,C,S",
                     "--ignore", "ANN401,S101",
+                    "--config", "lint.mccabe.max-complexity=4",
                     str(tmpfile),
                 ],
                 capture_output=True, text=True, timeout=30,
             )
             ruff_out = ruff_result.stdout.strip() or ruff_result.stderr.strip()
             if ruff_result.returncode == 0:
-                results.append("ruff(ANN/B006/S): OK")
+                results.append("ruff(ANN/B006/C/S): OK")
             else:
                 lines = [line for line in ruff_out.split("\n") if line.strip()]
-                results.append(f"ruff(ANN/B006/S): {len(lines)}件")
+                results.append(f"ruff(ANN/B006/C/S): {len(lines)}件")
                 if lines:
                     results.append("  " + "\n  ".join(lines[:10]))
         except FileNotFoundError:
@@ -232,18 +245,16 @@ def save_code(code: str) -> str:
 @tool
 def fix_code(code: str, lint_results: str) -> str:
     """lint結果を元にコードを修正する。"""
-    llm = build_chat_llm(temperature=0.2)
+    _llm = build_chat_llm(temperature=0.2)
     prompt = (
         f"以下のPythonコードは型ヒントのチェックでエラーが出ています。\n"
         f"修正後のコード全体を ```python ブロックで返してください。\n\n"
         f"## lint結果\n{lint_results}\n\n"
         f"## 現在のコード\n```python\n{code}\n```"
     )
-    response = llm.invoke([
-        SystemMessage(content=LINT_SYSTEM_PROMPT),
-        HumanMessage(content=prompt),
-    ])
-    return response.content
+    msgs = [SystemMessage(content=LINT_SYSTEM_PROMPT), HumanMessage(content=prompt)]
+    response = _invoke_llm("fix_code", _llm, msgs)
+    return response.content  # type: ignore[union-attr]
 
 
 # ========== 全てのツール ==========
@@ -275,7 +286,7 @@ SYSTEM_PROMPT = (
 def chat_node(state: CodingState) -> dict:
     """LLMを呼び出すノード。"""
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
-    response = llm.invoke(messages)
+    response = _invoke_llm(type(messages[-1]).__name__, llm, messages)
     if isinstance(response, AIMessage):
         response = augment_ai_message_with_fallback(response, FALLBACK_TOOL_NAMES)
     thinking = ""
