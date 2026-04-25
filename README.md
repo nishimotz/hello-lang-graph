@@ -124,6 +124,17 @@ make run-01
 | 1:35–1:50  | 常駐ループ（asyncio + CLI入力）                   | 05       |
 | 1:50–2:00  | デモ・デバッグ・Q&A                               | -        |
 
+## 第4回（2026年4月29日）タイムテーブル
+
+| 時間       | 内容                                              | Exercise |
+|------------|---------------------------------------------------|----------|
+| 0:00–0:10  | 前回のおさらい                                    | 01-05    |
+| 0:10–0:35  | 型ヒント必須サブセット + コード生成               | 06       |
+| 0:35–0:55  | run_lint（mypy + ruff）の仕組み                   | 06       |
+| 0:55–1:20  | フィードバックループ（生成→検証→修正→再検証）     | 06       |
+| 1:20–1:40  | 自由に試す・ツール追加                            | 06       |
+| 1:40–2:00  | デモ・共有・Q&A                                   | -        |
+
 ## Exercises
 
 各ステップの詳細な解説は `exercises/` ディレクトリに格納されています。
@@ -135,6 +146,7 @@ make run-01
 | 03 | `exercises/03_tools/` | ツール呼び出し + human-in-the-loop | `tool_chat.py` |
 | 04 | `exercises/04_memory/` | 要約メモリ + 構造化メモ | `memory_chat.py` |
 | 05 | `exercises/05_resident/` | 常駐ループ完成版 | `tiny_claw.py` |
+| 06 | `exercises/06_tiny_coding_agent/` | 型ヒント必須Python生成エージェント | `coding_agent.py` |
 
 各 Exercise の進め方：
 
@@ -188,6 +200,8 @@ make run-01
 - Langfuseでログ・トレース
 - Telegram / Discord bot化
 - 複数ツール（カレンダー、メール、ブラウザ操作など）
+- mypy / ruff 以外の linter 追加（pyright, basedpyright）
+- Human-in-the-loop 強化（承認プロセスのUI化）
 
 ## 主な環境変数
 

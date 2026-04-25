@@ -4,8 +4,8 @@ UV := uv
 LLM_PROVIDER ?= lmstudio
 OPENROUTER_MODEL ?= meta-llama/llama-3.1-8b-instruct
 
-.PHONY: help sync check lint run-01 run-02 run-03 run-04 run-05 \
-	run-openrouter-01 run-openrouter-05 clean-memory show-memory
+.PHONY: help sync check lint run-01 run-02 run-03 run-04 run-05 run-06 \
+	run-openrouter-01 run-openrouter-05 run-openrouter-06 clean-memory show-memory
 
 help:
 	@printf '%s\n' \
@@ -17,8 +17,10 @@ help:
 		'make run-03              - run Exercise 03' \
 		'make run-04              - run Exercise 04' \
 		'make run-05              - run Exercise 05' \
+		'make run-06              - run Exercise 06' \
 		'make run-openrouter-01   - run Exercise 01 with OpenRouter' \
 		'make run-openrouter-05   - run Exercise 05 with OpenRouter' \
+		'make run-openrouter-06   - run Exercise 06 with OpenRouter' \
 		'make clean-memory        - remove persistent summary memory' \
 		'make show-memory         - print the saved summary memory file'
 
@@ -35,7 +37,8 @@ check:
 		exercises/02_langgraph_state/stateful_chat.py \
 		exercises/03_tools/tool_chat.py \
 		exercises/04_memory/memory_chat.py \
-		exercises/05_resident/tiny_claw.py
+		exercises/05_resident/tiny_claw.py \
+		exercises/06_tiny_coding_agent/coding_agent.py
 
 lint:
 	$(UV) run ruff check .
@@ -55,11 +58,17 @@ run-04:
 run-05:
 	$(UV) run python exercises/05_resident/tiny_claw.py
 
+run-06:
+	$(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
+
 run-openrouter-01:
 	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/01_minimal_chat/chat.py
 
 run-openrouter-05:
 	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/05_resident/tiny_claw.py
+
+run-openrouter-06:
+	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
 
 clean-memory:
 	rm -f memory_store/summary_memory.json
