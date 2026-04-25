@@ -31,7 +31,7 @@ You> 整数のリストを受け取って合計と最小値を返す関数
 [ツール: run_lint]
   トップレベル検査: OK
   mypy: OK
-  ruff(ANN/B006/S): OK
+  ruff(ANN/B006/C/S/UP): OK
 [ツール: save_code]
   保存しました: exercises/06_tiny_coding_agent/output/code_001.py
 

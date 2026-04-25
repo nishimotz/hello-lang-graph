@@ -241,7 +241,7 @@ def generate_code(requirement: str) -> str:
 @tool
 def run_lint(code: str) -> str:
     """イミュータブル制約付きPythonコードに対して静的解析を実行する。
-    mypy、ruff ANN/B006/C/S、トップレベル禁止、イミュータブル制約チェックの結果をまとめて返す。"""
+    mypy、ruff ANN/B006/C/S/UP、トップレベル禁止、イミュータブル制約チェックの結果をまとめて返す。"""
     checked_code = _extract_python_code(code)
     results: list[str] = []
 
