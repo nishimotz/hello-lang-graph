@@ -33,17 +33,18 @@ SUBSET_RULES = (
     "7. 戻り値が None の関数は `-> None` を明示すること\n"
     "8. `dataclasses.dataclass` を使用する場合は全フィールドに型ヒントを付けること\n"
     "9. `TypedDict` を使用する場合は全フィールドに型ヒントを付けること\n"
-    "10. 空のコンテナは変数宣言と別行にしない（`items: list[int] = []`）\n\n"
+    "10. 空コンテナは型付きで書くこと（`items: list[int] = []`）。"
+    "dataclass フィールドでは `field(default_factory=list)` を使うこと\n\n"
     "コードブロックは ```python から始めてください。\n"
-    "生成したコードは `run_lint` ツールで検証できるように、コードブロックの中身だけでなく、"
-    "ファイルとして保存可能な形式で出力してください。"
+    "生成したコードは `run_lint` ツールで検証できるように、"
+    "コードブロックの中身だけでなく、ファイルとして保存可能な形式で出力してください。"
 )
 
 LINT_SYSTEM_PROMPT = (
     "あなたは型ヒントの正確さをチェックするアシスタントです。\n"
     "与えられた lint エラーを分析し、修正後のコードを提案してください。\n"
     "エラーがない場合は「問題ありません」とだけ答えてください。\n"
-    SUBSET_RULES
+    + SUBSET_RULES
 )
 
 PROMPT_DIR = Path(__file__).parent / "prompts"
@@ -96,12 +97,14 @@ def run_lint(code: str) -> str:
             if mypy_result.returncode == 0:
                 results.append("mypy: OK")
             else:
-                lines = [l for l in mypy_out.split("\n") if "check_code.py" in l]
+                lines = [
+                    line for line in mypy_out.split("\n") if "check_code.py" in line
+                ]
                 if lines:
                     results.append(f"mypy: {len(lines)}件")
                     results.append("  " + "\n  ".join(lines[:10]))
                 else:
-                    fallback = [l for l in mypy_out.split("\n") if l.strip()]
+                    fallback = [line for line in mypy_out.split("\n") if line.strip()]
                     if fallback:
                         results.append("mypy: エラー")
                         results.append("  " + "\n  ".join(fallback[:10]))
@@ -122,7 +125,7 @@ def run_lint(code: str) -> str:
             if ruff_result.returncode == 0:
                 results.append("ruff(ANN): OK")
             else:
-                lines = [l for l in ruff_out.split("\n") if l.strip()]
+                lines = [line for line in ruff_out.split("\n") if line.strip()]
                 results.append(f"ruff(ANN): {len(lines)}件")
                 if lines:
                     results.append("  " + "\n  ".join(lines[:10]))
@@ -162,7 +165,7 @@ llm = build_chat_llm(temperature=0.3).bind_tools(all_tools)
 SYSTEM_PROMPT = (
     "あなたは型ヒント必須Pythonコードを生成する Tiny Coding Agent です。\n"
     "日本語で応答してください。\n\n"
-    SUBSET_RULES + "\n\n"
+    + SUBSET_RULES + "\n\n"
     "ワークフロー:\n"
     "1. 要件を聞かれたら `generate_code` でコードを生成する\n"
     "2. 生成したコードを `run_lint` で検証する\n"

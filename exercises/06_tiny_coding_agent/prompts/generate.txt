@@ -11,6 +11,6 @@
 7. 戻り値 None は `-> None` を明示
 8. dataclass の全フィールドに型ヒント
 9. TypedDict の全フィールドに型ヒント
-10. 空コンテナは `items: list[int] = []` のように1行で
+10. 空コンテナの型付き初期化は通常の変数・ローカル変数では `items: list[int] = []` のように1行で書く。dataclass フィールドでは可変デフォルト値を避け、`field(default_factory=list)` / `field(default_factory=dict)` を使うこと
 
 コードブロック以外の説明は最小限にしてください。
