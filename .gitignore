@@ -20,9 +20,15 @@ memory_store/
 # Demo scratch files
 memo.txt
 
+# Generated code output
+exercises/06_tiny_coding_agent/output/
+exercises/07_immutable_agent/output/
+
 # IDE
 .idea/
 
 # OS
 .DS_Store
 Thumbs.db
+
+.env
