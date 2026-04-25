@@ -5,7 +5,7 @@ LLM_PROVIDER ?= lmstudio
 OPENROUTER_MODEL ?= meta-llama/llama-3.1-8b-instruct
 
 .PHONY: help sync check lint run-01 run-02 run-03 run-04 run-05 run-06 run-07 \
-	run-openrouter-01 run-openrouter-05 run-openrouter-06 run-openrouter-07 clean-memory show-memory
+	run-openrouter-01 run-openrouter-05 clean-memory show-memory
 
 help:
 	@printf '%s\n' \
@@ -21,8 +21,6 @@ help:
 		'make run-07              - run Exercise 07' \
 		'make run-openrouter-01   - run Exercise 01 with OpenRouter' \
 		'make run-openrouter-05   - run Exercise 05 with OpenRouter' \
-		'make run-openrouter-06   - run Exercise 06 with OpenRouter' \
-		'make run-openrouter-07   - run Exercise 07 with OpenRouter' \
 		'make clean-memory        - remove persistent summary memory' \
 		'make show-memory         - print the saved summary memory file'
 
@@ -70,14 +68,8 @@ run-openrouter-01:
 run-openrouter-05:
 	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/05_resident/tiny_claw.py
 
-run-openrouter-06:
-	@if [ -f .env ]; then . ./.env; fi && LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
-
 run-07:
 	@if [ -f .env ]; then . ./.env; fi && $(UV) run python exercises/07_immutable_agent/coding_agent.py
-
-run-openrouter-07:
-	@if [ -f .env ]; then . ./.env; fi && LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/07_immutable_agent/coding_agent.py
 
 clean-memory:
 	rm -f memory_store/summary_memory.json
