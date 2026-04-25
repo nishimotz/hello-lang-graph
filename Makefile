@@ -25,7 +25,7 @@ help:
 		'make show-memory         - print the saved summary memory file'
 
 sync:
-	$(UV) sync
+	$(UV) sync --extra dev
 
 check:
 	$(PYTHON) -m py_compile \
@@ -59,7 +59,7 @@ run-05:
 	$(UV) run python exercises/05_resident/tiny_claw.py
 
 run-06:
-	$(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
+	@if [ -f .env ]; then . ./.env; fi && $(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
 
 run-openrouter-01:
 	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/01_minimal_chat/chat.py
@@ -68,7 +68,7 @@ run-openrouter-05:
 	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/05_resident/tiny_claw.py
 
 run-openrouter-06:
-	LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
+	@if [ -f .env ]; then . ./.env; fi && LLM_PROVIDER=openrouter OPENROUTER_MODEL=$(OPENROUTER_MODEL) $(UV) run python exercises/06_tiny_coding_agent/coding_agent.py
 
 clean-memory:
 	rm -f memory_store/summary_memory.json

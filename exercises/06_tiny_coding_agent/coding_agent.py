@@ -4,6 +4,7 @@ LangGraph の ReAct ループで「要求 → コード生成 → 静的解析 �
 自動で回すエージェント。型ヒントが必須の Python サブセットを対象とする。
 """
 
+import ast
 import re
 import subprocess
 import tempfile
@@ -36,7 +37,13 @@ SUBSET_RULES = (
     "8. `dataclasses.dataclass` を使用する場合は全フィールドに型ヒントを付けること\n"
     "9. `TypedDict` を使用する場合は全フィールドに型ヒントを付けること\n"
     "10. 空コンテナは型付きで書くこと（`items: list[int] = []`）。"
-    "dataclass フィールドでは `field(default_factory=list)` を使うこと\n\n"
+    "dataclass フィールドでは `field(default_factory=list)` を使うこと\n"
+    "11. 関数のデフォルト引数に可変オブジェクト（`list`, `dict`, `set`）を使わないこと"
+    "（`run_lint` で自動検証）\n"
+    "12. `eval`, `exec`, `compile`, `__import__`, `getattr`, `setattr`, `delattr` の"
+    "使用を禁止すること（`run_lint` で自動検証）\n"
+    "13. トップレベルに実行コードを書かないこと。"
+    "関数定義・クラス定義・import・定数定義のみ許可（`run_lint` で自動検証）\n\n"
     "コードブロックは ```python から始めてください。\n"
     "生成したコードは `run_lint` ツールで検証できるように、"
     "コードブロックの中身だけでなく、ファイルとして保存可能な形式で出力してください。"
@@ -76,6 +83,38 @@ def _extract_python_code(text: str) -> str:
     return text.strip()
 
 
+def _check_toplevel(code: str) -> list[str]:
+    """トップレベルに実行コードがないか AST で検査する。"""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return [f"構文エラー: {e}"]
+    violations: list[str] = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (
+            ast.Import, ast.ImportFrom,
+            ast.FunctionDef, ast.AsyncFunctionDef,
+            ast.ClassDef, ast.Assign, ast.AnnAssign,
+        )):
+            continue
+        if isinstance(node, ast.If):
+            test = node.test
+            if (
+                isinstance(test, ast.Compare)
+                and isinstance(test.left, ast.Name)
+                and test.left.id == "__name__"
+                and len(test.comparators) == 1
+                and isinstance(test.comparators[0], ast.Constant)
+                and test.comparators[0].value == "__main__"
+            ):
+                continue
+        lineno = getattr(node, "lineno", "?")
+        violations.append(
+            f"  行{lineno}: トップレベルに実行コードがあります ({type(node).__name__})"
+        )
+    return violations
+
+
 @tool
 def generate_code(requirement: str) -> str:
     """与えられた要件に基づいて型ヒント必須のPythonコードを生成する。"""
@@ -92,15 +131,22 @@ def generate_code(requirement: str) -> str:
 @tool
 def run_lint(code: str) -> str:
     """型ヒントを含むPythonコードに対して静的解析を実行する。
-    mypy（型チェック）と ruff ANN（関数の引数・戻り値アノテーション）の
-    結果をまとめて返す。変数アノテーションの網羅的な検証は行わない。
-    Any の簡易検査も行う。"""
+    mypy（型チェック）、ruff ANN/B006/S（関数アノテーション・可変デフォルト引数・
+    動的実行禁止）、トップレベル実行コード禁止チェックの結果をまとめて返す。"""
     checked_code = _extract_python_code(code)
     results = []
 
     # Any の簡易検査
     if re.search(r"\bAny\b", checked_code):
         results.append("Any検査: 失敗（Anyの使用は禁止されています）")
+
+    # トップレベル実行コード禁止
+    toplevel_violations = _check_toplevel(checked_code)
+    if toplevel_violations:
+        results.append(f"トップレベル検査: {len(toplevel_violations)}件")
+        results.extend(toplevel_violations)
+    else:
+        results.append("トップレベル検査: OK")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfile = Path(tmpdir) / "check_code.py"
@@ -134,18 +180,23 @@ def run_lint(code: str) -> str:
         except subprocess.TimeoutExpired:
             results.append("mypy: タイムアウト")
 
-        # ruff
+        # ruff (ANN + B006 + S)
         try:
             ruff_result = subprocess.run(
-                ["uv", "run", "ruff", "check", "--select", "ANN", str(tmpfile)],
+                [
+                    "uv", "run", "ruff", "check",
+                    "--select", "ANN,B006,S",
+                    "--ignore", "ANN401,S101",
+                    str(tmpfile),
+                ],
                 capture_output=True, text=True, timeout=30,
             )
             ruff_out = ruff_result.stdout.strip() or ruff_result.stderr.strip()
             if ruff_result.returncode == 0:
-                results.append("ruff(ANN): OK")
+                results.append("ruff(ANN/B006/S): OK")
             else:
                 lines = [line for line in ruff_out.split("\n") if line.strip()]
-                results.append(f"ruff(ANN): {len(lines)}件")
+                results.append(f"ruff(ANN/B006/S): {len(lines)}件")
                 if lines:
                     results.append("  " + "\n  ".join(lines[:10]))
         except FileNotFoundError:
@@ -154,6 +205,28 @@ def run_lint(code: str) -> str:
             results.append("ruff: タイムアウト")
 
     return "\n".join(results)
+
+
+_OUTPUT_DIR = Path(__file__).parent / "output"
+
+
+@tool
+def save_code(code: str) -> str:
+    """lint が通ったコードをファイルに保存する。連番ファイル名で output/ に保存する。"""
+    _OUTPUT_DIR.mkdir(exist_ok=True)
+    existing = sorted(_OUTPUT_DIR.glob("code_*.py"))
+    next_num = len(existing) + 1
+    out_path = _OUTPUT_DIR / f"code_{next_num:03d}.py"
+    out_path.write_text(_extract_python_code(code), encoding="utf-8")
+    rel = out_path.relative_to(Path.cwd()) if out_path.is_relative_to(Path.cwd()) else out_path
+    return (
+        f"保存しました: {rel}\n\n"
+        f"**実行コマンド:**\n"
+        f"```bash\n"
+        f"uv run python -i {rel}\n"
+        f">>> \n"
+        f"```"
+    )
 
 
 @tool
@@ -175,7 +248,7 @@ def fix_code(code: str, lint_results: str) -> str:
 
 # ========== 全てのツール ==========
 
-all_tools = [generate_code, run_lint, fix_code]
+all_tools = [generate_code, run_lint, fix_code, save_code]
 FALLBACK_TOOL_NAMES = frozenset(t.name for t in all_tools)
 
 CHAT_CONFIG = get_chat_config()
@@ -191,7 +264,8 @@ SYSTEM_PROMPT = (
     "3. エラーがあれば `fix_code` で修正する\n"
     "4. 修正後は再度 `run_lint` で検証する\n"
     "5. lint が通るまで繰り返す\n"
-    "6. 最終的なコードを表示する"
+    "6. lint が全て OK になったら `save_code` でファイルに保存する\n"
+    "7. 保存パスと実行コマンドをユーザーに伝える"
 )
 
 
@@ -261,6 +335,21 @@ def _run_tools(state: CodingState) -> dict:
 # ========== メイン ==========
 
 
+def _print_tool_result(tool_name: str, content: str) -> None:
+    """ツール結果をツール種別に応じて整形して表示する。"""
+    if tool_name == "run_lint":
+        for line in content.strip().split("\n"):
+            print(f"  {line}")
+    elif tool_name in ("generate_code", "fix_code"):
+        lines = content.strip().split("\n")
+        for line in lines[:8]:
+            print(f"  {line}")
+        if len(lines) > 8:
+            print(f"  ... ({len(lines) - 8}行省略)")
+    else:
+        print(f"  {content}")
+
+
 def main() -> None:
     """メインのチャットループ。"""
     print("=" * 50)
@@ -270,7 +359,7 @@ def main() -> None:
     print(f"Provider: {CHAT_CONFIG.app_name}")
     print(f"API Base URL: {CHAT_CONFIG.base_url}")
     print(f"Chat Model: {CHAT_CONFIG.model}")
-    print("ツール: generate_code, run_lint, fix_code")
+    print("ツール: generate_code, run_lint, fix_code, save_code")
     print("'exit' で終了\n")
 
     memory = MemorySaver()
@@ -296,21 +385,40 @@ def main() -> None:
             break
 
         try:
-            result = app.invoke(
+            last_ai_msg: AIMessage | None = None
+            last_thinking: str = ""
+            pending_tool_calls: dict[str, str] = {}
+            for chunk in app.stream(
                 {"messages": [HumanMessage(content=user_input)]},
                 config=config,
-            )
+                stream_mode="updates",
+            ):
+                for node_name, node_output in chunk.items():
+                    if node_name == "chat":
+                        thinking = node_output.get("thinking", "")
+                        if thinking:
+                            last_thinking = thinking
+                        for msg in node_output.get("messages", []):
+                            if isinstance(msg, AIMessage):
+                                last_ai_msg = msg
+                                if msg.tool_calls:
+                                    for tc in msg.tool_calls:
+                                        print(f"[ツール: {tc['name']}]")
+                                        pending_tool_calls[tc["id"]] = tc["name"]
+                    elif node_name == "tools":
+                        for msg in node_output.get("messages", []):
+                            if isinstance(msg, ToolMessage):
+                                tool_name = pending_tool_calls.get(msg.tool_call_id, "")
+                                _print_tool_result(tool_name, msg.content)
         except Exception as exc:
             print(f"[エラー] {exc}\n")
             continue
 
-        thinking = result.get("thinking", "")
-        if thinking:
-            print(f"[思考] {thinking[:200]}...")
+        if last_thinking:
+            print(f"[思考] {last_thinking[:200]}...")
 
-        last_msg = result["messages"][-1]
-        if isinstance(last_msg, AIMessage):
-            print(f"\n{last_msg.content}\n")
+        if last_ai_msg and not last_ai_msg.tool_calls:
+            print(f"\nAI> {last_ai_msg.content}\n")
 
 
 if __name__ == "__main__":
