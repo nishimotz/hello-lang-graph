@@ -24,8 +24,9 @@ SUBSET_RULES = (
     "## 型ヒント必須サブセットのルール\n\n"
     "あなたは型ヒントが必須のPythonコードを生成するアシスタントです。\n"
     "以下のルールに従ってください:\n\n"
-    "1. 全ての関数に引数と戻り値の型ヒントを付けること\n"
-    "2. 全ての変数に型ヒントを付けること（=`value` の前に `name: Type`）\n"
+    "1. 全ての関数に引数と戻り値の型ヒントを付けること（`run_lint` で自動検証）\n"
+    "2. 変数にも可能な限り型ヒントを付けること（`name: Type = value` の形式。"
+    "コード規約であり、静的解析では関数アノテーションを主に検証）\n"
     "3. `Any` は使用禁止\n"
     "4. 暗黙の `Optional` は禁止。`int | None` のように Union 構文を使うこと\n"
     "5. `list`, `dict` などの組み込み型は `list[int]` のようにパラメータ化すること\n"
@@ -81,7 +82,8 @@ def generate_code(requirement: str) -> str:
 @tool
 def run_lint(code: str) -> str:
     """型ヒントを含むPythonコードに対して静的解析を実行する。
-    mypy, ruff の結果をまとめて返す。"""
+    mypy（型チェック）と ruff ANN（関数の引数・戻り値アノテーション）の
+    結果をまとめて返す。変数アノテーションの網羅的な検証は行わない。"""
     results = []
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfile = Path(tmpdir) / "check_code.py"
