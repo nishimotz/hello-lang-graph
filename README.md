@@ -7,6 +7,8 @@
 [hello-litestar-htmx](https://github.com/nishimotz/hello-litestar-htmx)、
 [hello-pandas3](https://github.com/nishimotz/hello-pandas3) に続くシリーズ第3弾です。
 
+**2026年4月29日**開催の [すごい広島 with Python 109](https://pycon-hiroshima.connpass.com/event/390122/) で **Exercise 06**（型ヒント必須の Tiny Coding Agent）と **Exercise 07**（イミュータブル制約版）を紹介し、開催済みです。録画視聴・自習用のハンズオン資料としてそのまま使えます。
+
 ## 完成イメージ（2時間後）
 
 ```text
@@ -28,7 +30,7 @@ y → 「晴れ 21℃です。リストに追記完了！」
 - LM Studio や OpenRouter でエージェントを試したい人
 - 「DockerとかFastAPIとか全部入れるのもう疲れた…」と思ってる人
 
-## 必要なもの（2026年3月時点）
+## 必要なもの（2026年4月時点）
 
 - **ソフトウェア**
   - Python 3.13（3.14では依存ライブラリが警告を出すため）
@@ -57,8 +59,8 @@ make sync
 - `OpenRouter`:
   すぐ始めやすい。LM Studio が使えない参加者向けの代替ルート
 
-この教材では `Exercise 01-05` を LM Studio / OpenRouter のどちらでも進められます。
-後半は embeddings を使わず、要約メモリと構造化メモで長期記憶を作ります。
+この教材では `Exercise 01-07` を LM Studio / OpenRouter のどちらでも進められます（07 は README に記載のとおり OpenRouter や Ollama Cloud 向けの設定例があります）。
+`Exercise 04` と `05` では embeddings を使わず、要約メモリと構造化メモで長期記憶を作ります。
 
 ## セットアップ例
 
@@ -124,7 +126,7 @@ make run-01
 | 1:35–1:50  | 常駐ループ（asyncio + CLI入力）                   | 05       |
 | 1:50–2:00  | デモ・デバッグ・Q&A                               | -        |
 
-## 第4回（2026年4月29日）タイムテーブル
+## [すごい広島 with Python 109](https://pycon-hiroshima.connpass.com/event/390122/)（2026年4月29日・開催済み）タイムテーブル
 
 | 時間       | 内容                                              | Exercise |
 |------------|---------------------------------------------------|----------|
@@ -132,8 +134,9 @@ make run-01
 | 0:10–0:35  | 型ヒント必須サブセット + コード生成               | 06       |
 | 0:35–0:55  | run_lint（mypy + ruff）の仕組み                   | 06       |
 | 0:55–1:20  | フィードバックループ（生成→検証→修正→再検証）     | 06       |
-| 1:20–1:40  | 自由に試す・ツール追加                            | 06       |
-| 1:40–2:00  | デモ・共有・Q&A                                   | -        |
+| 1:20–1:35  | 自由に試す・ツール追加（06）                      | 06       |
+| 1:35–1:45  | Exercise 07（イミュータブル版）の紹介・デモ     | 07       |
+| 1:45–2:00  | 共有・Q&A                                         | -        |
 
 ## Exercises
 
@@ -183,7 +186,7 @@ make run-01
 - Exercise 04/05 の長期記憶は `summary_memory.json` に保存されるため、再起動後も参照できます。
 - Exercise 05 は `asyncio` ベースですが、危険ツールの承認確認は同期入力です。
 - Web 検索（`ddgs`）が使えない環境でも、エラーメッセージを返して進行できるようにしています。
-- OpenRouter でも `Exercise 01-05` を通しやすくなっています。
+- OpenRouter でも `Exercise 01-07` を通しやすくなっています。
 
 ## 推奨LM Studio設定（gpt-oss-20b）
 
